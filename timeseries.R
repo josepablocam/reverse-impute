@@ -32,7 +32,7 @@ add_missing <- function(vec, prob) {
     mask <- gen_missing_mask(length(vec), prob)
     copy_vec <- vec
     copy_vec[mask] <- NA
-    list(orig=vec, with_missing=copy_vec, mask=mask)
+    list(orig=vec, with_missing=copy_vec, mask=mask, time=seq_along(vec))
 }
 
 impute_missing <- function(vec, method_name) {
@@ -79,6 +79,7 @@ generate_dataset <- function(num_ts, num_obs=200, probs=c(0.2), methods=c("mean"
                 generated_df$method <- method
                 generated_df$ts_id <- ts_id
                 generated_df$iter <- iter_
+                generated_df$unique_id <- list_ix
 
                 all_generated[[list_ix]] <- generated_df
                 list_ix <- list_ix + 1
