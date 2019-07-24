@@ -32,6 +32,8 @@ def generate_dataset(
         num_iters=num_iters,
         seed=seed,
     )
+    if not isinstance(df, pd.DataFrame):
+        df = pandas2ri.ri2py(df)
     return df
 
 
