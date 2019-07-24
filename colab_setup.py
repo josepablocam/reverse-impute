@@ -13,7 +13,8 @@ def bash(cmd):
 def setup():
     R("install.packages('imputeTS')")
     bash(
-        "rm -rf /content/reverse-impute; git clone git@github.com:josepablocam/reverse-impute.git /content/reverse-impute/"
+        "git pull origin master"
+        rm -rf /content/reverse-impute; git clone git@github.com:josepablocam/reverse-impute.git /content/reverse-impute/"
     )
     bash("pip install tensorboardX")
 
