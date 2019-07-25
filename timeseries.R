@@ -17,9 +17,10 @@ gen_ts_config <- function(max_ar=5, max_ma=5, max_diff=3) {
 
 
 gen_ts <- function(config, n) {
-  vec <- arima.sim(model=config, n=n)
+  ext_n <- n + config$order[3]
+  vec <- arima.sim(model=config, n=ext_n)
   vec <- as.numeric(vec)
-  vec[seq(config$order[3], n)]
+  vec[seq(config$order[3], ext_n)]
 }
 
 

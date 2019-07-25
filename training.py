@@ -5,12 +5,17 @@ import pandas as pd
 import numpy as np
 
 
+def get_matrix_vals(df, key_col, val_col):
+    lists = df.groupby(key_col)[val_col].apply(list).values
+    return np.array([np.array(l) for l in lists])
+
+
 class TSDataset(data.Dataset):
     def __init__(self, df):
         df = df.sort_values(["unique_id", "time"], ascending=True)
         self.df = df
-        self.X = df.groupby("unique_id").filled.values
-        self.y = df.groupby("unique_id").mask.values
+        self.X = get_matrix_vals(df, "unique_id", "filled")
+        self.y = get_matrix_vals(df, "unique_id", "mask")
         self.num_obs = X.shape[0]
 
     def __len__(self):
@@ -22,8 +27,9 @@ class TSDataset(data.Dataset):
         return torch.tensor(chosen_X).unsqueeze(2), torch.tensor(chosen_y)
 
 
-def get_data(csv_path, frac_valid, frac_test, seed=None):
-    df = pd.read_csv(csv_path)
+def get_data(df, frac_valid, frac_test, seed=None):
+    if isinstance(df, str):
+        df = pd.read_csv(df)
     # need to split data along ts_id
     # otherwise can memorize
     ts_ids = df.ts_id.unique()
@@ -36,11 +42,11 @@ def get_data(csv_path, frac_valid, frac_test, seed=None):
 
     train_ids = ts_ids[:num_train]
     val_ids = ts_ids[num_train:(num_train + num_valid)]
-    test_ids = test_ids[(num_train + num_valid):]
+    test_ids = ts_ids[(num_train + num_valid):]
     cats = {"train": train_ids, "val": val_ids, "test": test_ids}
     datasets = {}
     for cat, cat_ids in cats.items():
-        df_subset = df.ts_id.isin(cat_ids).reset_index(drop=True)
+        df_subset = df[df.ts_id.isin(cat_ids)].reset_index(drop=True)
         dataset_subset = TSDataset(df_subset)
         datasets[cat] = dataset_subset
     return datasets
