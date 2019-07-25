@@ -5,6 +5,7 @@ from rpy2 import robjects
 from rpy2.robjects import pandas2ri
 from rpy2.robjects.packages import importr
 import numpy as np
+import torch
 
 pandas2ri.activate()
 rinterpreter = robjects.r
