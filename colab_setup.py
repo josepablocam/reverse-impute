@@ -4,7 +4,7 @@ from IPython import get_ipython
 ipython = get_ipython()
 
 def R(cmd):
-    ipython.run_cell_magic("R", "", cmd)
+    ipython.run_line_magic("R", "", cmd)
 
 def bash(cmd):
     ipython.run_cell_magic("bash", "", cmd)
