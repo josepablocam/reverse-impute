@@ -48,7 +48,7 @@ def get_data(df, frac_valid, frac_test, seed=None):
     train_ids = ts_ids[:num_train]
     val_ids = ts_ids[num_train:(num_train + num_valid)]
     test_ids = ts_ids[(num_train + num_valid):]
-    cats = {"train": train_ids, "val": val_ids, "test": test_ids}
+    cats = {"train": train_ids, "valid": val_ids, "test": test_ids}
     datasets = {}
     for cat, cat_ids in cats.items():
         df_subset = df[df.ts_id.isin(cat_ids)].reset_index(drop=True)
@@ -58,19 +58,19 @@ def get_data(df, frac_valid, frac_test, seed=None):
 
 
 class Trainer(object):
-    def __init__(self, num_iters, batch_size):
-        self.num_iters = num_iters
-        self.batch_size = batch_size
-        self.ma_max_ct = 100
+    def __init__(self, ma_max_ct=50):
+        self.ma_max_ct = ma_max_ct
 
-    def evaluate(self, model, eval_dataset):
+    def evaluate(self, model, eval_dataset, device="cpu"):
         eval_loader = data.DataLoader(
             eval_dataset,
             batch_size=len(eval_dataset),
         )
         model.eval()
-        with torch.no_gradient():
+        with torch.no_grad():
             X, y = next(iter(eval_loader))
+            X = X.to(torch.device(device))
+            y = y.to(torch.device(device))
             loss = model.compute_loss(X, y)
         model.train()
         return loss
@@ -79,42 +79,61 @@ class Trainer(object):
             self,
             model,
             datasets,
+            num_iters,
+            batch_size=100,
             valid_every_n_batches=None,
+            device="cpu",
+            tensorboard_log=None
     ):
+        model = model.to(torch.device(device))
+
         optimizer = optim.Adam(model.parameters())
 
-        monitor = SummaryWriter()
+        if tensorboard_log is None:
+            tensorboard_log = "runs/exp-1"
+        monitor = SummaryWriter(tensorboard_log)
         iter_ct = 0
-        ma_losses = []
+
+        info = []
+        ma_train_losses = []
 
         train_dataset = datasets["train"]
         train_loader = data.DataLoader(
             train_dataset,
             shuffle=True,
-            batch_size=self.batch_size,
+            batch_size=batch_size,
         )
 
-        for _ in tqdm.tqdm(range(self.num_iters)):
+        for _ in tqdm.tqdm(range(num_iters)):
             for X, y in train_loader:
+                X = X.to(torch.device(device))
+                y = y.to(torch.device(device))
                 optimizer.zero_grad()
                 batch_loss = model.compute_loss(X, y)
                 batch_loss.backward()
                 optimizer.step()
                 iter_ct += 1
+
                 monitor.add_scalar("data/batch_loss", batch_loss, iter_ct)
-                if len(ma_losses) >= self.ma_max_ct:
-                    ma_losses = ma_losses.pop(0)
-                ma_losses.append(batch_loss)
+                if len(ma_train_losses) >= self.ma_max_ct:
+                    ma_train_losses.pop(0)
+                ma_train_losses.append(batch_loss.item())
                 monitor.add_scalar(
                     "data/ma_loss",
-                    torch.mean(ma_losses),
+                    np.mean(ma_train_losses),
                     iter_ct,
                 )
                 if valid_every_n_batches is not None and iter_ct % valid_every_n_batches == 0:
-                    valid_loss = self.evaluate(model, datasets["valid"])
+                    valid_loss = self.evaluate(model, datasets["valid"], device)
                     monitor.add_scalar(
                         "data/valid_loss",
                         valid_loss,
                         iter_ct,
                     )
-        return model
+                    iter_info = {}
+                    iter_info["train_ma_loss"] = np.mean(ma_train_losses)
+                    iter_info["val_loss"] = valid_loss.item()
+                    iter_info["iter_ct"] = iter_ct
+                    info.append(iter_info)
+
+        return model, pd.DataFrame(info)
