@@ -34,5 +34,6 @@ class RepairImpute(object):
 
     def reimpute(self, ts, method, threshold=0.5):
         ts_with_missing = self.remove_imputed(ts, threshold)
+        ts_with_missing = pd.Series(ts_with_missing)
         filled = impute_missing_(ts_with_missing, method)
-        return filled.ri2py()
+        return np.array(filled)
