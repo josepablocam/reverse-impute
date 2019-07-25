@@ -1,24 +1,26 @@
 import sklearn.metrics
 import torch
+import numpy as np
 
 
 def evaluate_model(
         model,
-        X_test,
-        y_test,
+        X,
+        y,
 ):
     cpu = torch.device("cpu")
     model = model.to(cpu)
     model = model.eval()
-    X_test = X_test.to(cpu)
-    y_test = y_test.to(cpu)
+    if isinstance(X, np.ndarray):
+        X = torch.tensor(X).to(torch.float32)
+        X = X.to(cpu)
 
-    scores = model(X_test)
+    with torch.no_grad():
+        scores = model(X)
     y_probs = torch.sigmoid(scores)
-
     y_probs = y_probs.numpy().flatten()
-    y_test = y_test.numpy().flatten()
+    y = y.flatten()
     results = {
-        "auc": metrics.roc_auc_score(y_test, y_probs),
+        "auc": sklearn.metrics.roc_auc_score(y, y_probs),
     }
     return results
