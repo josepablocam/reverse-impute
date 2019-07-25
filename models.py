@@ -44,8 +44,8 @@ class MissingPredictor(nn.Module):
 
     def forward(self, batch):
         # batch shape: (num ts, num steps, dim(context) + 1)
-        # return shape: (num ts, num steps, 1)
-        return self.layers(batch)
+        # return shape: (num ts, num steps)
+        return self.layers(batch).squeeze(2)
 
 
 class SequenceEncoder(nn.Module):

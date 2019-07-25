@@ -1,8 +1,10 @@
-from tensorboardX import SummaryWriter
-import torch.optim as optim
-import torch.utils.data as data
 import pandas as pd
 import numpy as np
+from tensorboardX import SummaryWriter
+import torch
+import torch.optim as optim
+import torch.utils.data as data
+import tqdm
 
 
 def get_matrix_vals(df, key_col, val_col):
@@ -16,7 +18,7 @@ class TSDataset(data.Dataset):
         self.df = df
         self.X = get_matrix_vals(df, "unique_id", "filled")
         self.y = get_matrix_vals(df, "unique_id", "mask")
-        self.num_obs = X.shape[0]
+        self.num_obs = self.X.shape[0]
 
     def __len__(self):
         return self.num_obs
@@ -24,7 +26,10 @@ class TSDataset(data.Dataset):
     def __getitem__(self, ix):
         chosen_X = self.X[ix]
         chosen_y = self.y[ix]
-        return torch.tensor(chosen_X).unsqueeze(2), torch.tensor(chosen_y)
+        return (
+            torch.tensor(chosen_X).to(torch.float32),
+            torch.tensor(chosen_y).to(torch.float32)
+        )
 
 
 def get_data(df, frac_valid, frac_test, seed=None):
@@ -76,7 +81,7 @@ class Trainer(object):
             datasets,
             valid_every_n_batches=None,
     ):
-        optimizer = self.optimizer(model.parameters())
+        optimizer = optim.Adam(model.parameters())
 
         monitor = SummaryWriter()
         iter_ct = 0
