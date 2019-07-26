@@ -17,7 +17,7 @@ AVAILABLE_IMPUTATION_METHODS <- list(
   linear_interpolation=function(x) na_interpolation(x, option="linear"),
   spline_interpolation=function(x) na_interpolation(x, option="spline"),
   stine_interpolation=function(x) na_interpolation(x, option="stine"),
-  kalman_arima=function(x) scaled_na_kalman(x, model="auto.arima")
+  kalman_arima=function(x) na_kalman(x, model="auto.arima")
 )
 
 

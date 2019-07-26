@@ -13,6 +13,7 @@ def bash(cmd):
 def setup():
     ipython.run_line_magic("load_ext", "rpy2.ipython")
     R("install.packages('imputeTS')")
+    R("install.packages('argparse')")
     bash("pip install tensorboardX")
 
 
