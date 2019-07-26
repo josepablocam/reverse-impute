@@ -16,6 +16,7 @@ class TSDataset(data.Dataset):
     def __init__(self, df):
         df = df.sort_values(["unique_id", "time"], ascending=True)
         self.df = df
+        self.unique_id = df.groupby("unique_id").size().index.values
         self.X = get_matrix_vals(df, "unique_id", "filled")
         self.y = get_matrix_vals(df, "unique_id", "mask")
         self.num_obs = self.X.shape[0]

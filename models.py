@@ -63,16 +63,23 @@ class SequenceEncoder(nn.Module):
         else:
             raise Exception("Unknown model type: {}".format(encoder_type))
 
+    def zscore(self, batch):
+        # batch shape: (num_ts, num steps, 1)
+        means = batch.mean(dim=1).unsqueeze(2)
+        sd = batch.std(dim=1).unsqueeze(2)
+        return (batch - means) / sd
+
     def forward(self, batch):
         # batch shape: (num ts, num steps, 1)
         # output shape: (num ts, num steps, num_dirs * hidden_size + 1)
         if len(batch.shape) == 2:
             batch = batch.unsqueeze(2)
-        output, (hn, cn) = self.encoder(batch)
+        batch = self.zscore(batch)
+        H, (hn, cn) = self.encoder(batch)
         # append to each num steps the observed value as well
         # technically already captured by hidden state, but still
         # adding
-        return torch.cat((output, batch), dim=2)
+        return torch.cat((H, batch), dim=2)
 
 
 class ReverseImputer(nn.Module):

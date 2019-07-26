@@ -9,6 +9,9 @@ pandas2ri.activate()
 rinterpreter = robjects.r
 rinterpreter.source("timeseries.R")
 
+AVAILABLE_IMPUTATION_METHODS = [
+    str(n) for n in rinterpreter("AVAILABLE_IMPUTATION_METHODS").names
+]
 generate_dataset_ = rinterpreter("generate_dataset")
 
 
@@ -23,7 +26,7 @@ def generate_dataset(
     if probs is None:
         probs = [0.2]
     if methods is None:
-        methods = ["mean"]
+        methods = AVAILABLE_IMPUTATION_METHODS
     df = generate_dataset_(
         num_ts,
         num_obs,
@@ -39,7 +42,8 @@ def generate_dataset(
 
 def get_args():
     parser = ArgumentParser(
-        description="Generate dataset for timeseries w/ missing data")
+        description="Generate dataset for timeseries w/ missing data"
+    )
     parser.add_argument(
         "--output",
         type=str,

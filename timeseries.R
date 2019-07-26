@@ -1,6 +1,26 @@
 require("imputeTS")
 require("progress")
 
+AVAILABLE_IMPUTATION_METHODS <- list(
+  mean=function(x) na_mean(x, option="mean"),
+  median=function(x) na_mean(x, option="median"),
+  mode=function(x) na_mean(x, option="mode"),
+  random=function(x) na_random(x),
+  zeros=function(x) na_replace(x, fill=0),
+  ones=function(x) na_replace(x, fill=1),
+  forward=function(x) na_locf(x, option="locf"),
+  backward=function(x) na_locf(x, option="nocb"),
+  ma_simple=function(x) na_ma(x, weighting="simple"),
+  ma_linear=function(x) na_ma(x, weighting="linear"),
+  ma_exponential=function(x) na_ma(x, weighting="exponential"),
+  linear_interpolation=function(x) na_interpolation(x, option="linear"),
+  spline_interpolation=function(x) na_interpolation(x, option="spline"),
+  stine_interpolation=function(x) na_interpolation(x, option="stine"),
+  kalman_struct=function(x) na_kalman(x, model="StructTS"),
+  kalman_arima=function(x) na_kalman(x, model="auto.arima")
+)
+
+
 gen_ts_config <- function(max_ar=5, max_ma=5, max_diff=3) {
   num_ar <- sample(1:max_ar, 1)
   num_ma <- sample(1:max_ma, 1)
@@ -37,15 +57,7 @@ add_missing <- function(vec, prob) {
 }
 
 impute_missing <- function(vec, method_name) {
-    methods <- list(
-      mean=function(x) na_mean(x, option="mean"),
-      median=function(x) na_mean(x, option="median"),
-      mode=function(x) na_mean(x, option="mode"),
-      random=function(x) na_random(x),
-      forward=function(x) na_locf(x, option="locf"),
-      backward=function(x) na_locf(x, option="nocb")
-    )
-    chosen_method <- methods[[method_name]]
+    chosen_method <- AVAILABLE_IMPUTATION_METHODS[[method_name]]
     chosen_method(vec)
 }
 
