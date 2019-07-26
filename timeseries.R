@@ -1,5 +1,20 @@
 require("imputeTS")
 require("progress")
+require("scales")
+
+scaled_na_kalman <- function(x, model){
+# to address the issue mentioned in
+# https://github.com/SteffenMoritz/imputeTS/issues/26
+  x_scaled <- scales:::rescale(x, c(0, 1))
+  if (model == "StructTS") {
+    x_filled <- na_kalman(x_scaled, model=model, type="level")
+  } else {
+    x_filled <- na_kalman(x_scaled, model=model)
+  }
+  x_rescaled <- scales:::rescale(x_filled, c(min(x, na.rm = T), max(x, na.rm = T)))
+  x_rescaled
+}
+
 
 AVAILABLE_IMPUTATION_METHODS <- list(
   mean=function(x) na_mean(x, option="mean"),
@@ -16,8 +31,8 @@ AVAILABLE_IMPUTATION_METHODS <- list(
   linear_interpolation=function(x) na_interpolation(x, option="linear"),
   spline_interpolation=function(x) na_interpolation(x, option="spline"),
   stine_interpolation=function(x) na_interpolation(x, option="stine"),
-  kalman_struct=function(x) na_kalman(x, model="StructTS"),
-  kalman_arima=function(x) na_kalman(x, model="auto.arima")
+  kalman_struct=function(x) scaled_na_kalman(x, model="StructTS"),
+  kalman_arima=function(x) scaled_na_kalman(x, model="auto.arima")
 )
 
 
