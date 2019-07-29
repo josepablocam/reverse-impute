@@ -63,16 +63,21 @@ def compute_ts_stats(repairer, dataset, threshold):
 
     for i in tqdm.tqdm(range(nrows)):
         y_obs = y[i, :]
-        y_pred = y_hat[i, :]
+        y_pred = yhat[i, :]
+        subset_df = df.loc[unique_ids[i]]
         info = summary_classification_stats(y_obs, y_pred)
         info["unique_id"] = unique_ids[i]
-        info["impute_method"] = df.loc[unique_ids[i]].method
+        info["impute_method"] = subset_df.method.values[0]
+        info["orig_mse"] = sklearn.metrics.mean_squared_error(
+            subset_df.orig.values,
+            subset_df.filled.values,
+        )
         results.append(info)
     return pd.DataFrame(results)
 
 
 def summarize_ts_stats(df):
-    return df.groupby("impute_method")[["f1", "precision", "recall"]].mean()
+    return df.groupby("impute_method")[["f1", "precision", "recall", "orig_mse"]].mean()
 
 
 # def compute_per_ts_stats(

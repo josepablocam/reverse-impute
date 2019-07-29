@@ -69,12 +69,21 @@ class SequenceEncoder(nn.Module):
         sd = batch.std(dim=1).unsqueeze(2)
         return (batch - means) / sd
 
+    def lagged_diff(self, batch, n_lag):
+        n_ts = batch.shape[0]
+        n_time = batch.shape[1]
+        diffed_ts = batch[n_lag:, :] - batch[:(n_time - n_lag), :]
+        # first n differences are zero by definition
+        zeros = torch.zeros((n_ts, n_lag, 1))
+        return torch.cat((zeros, diffed_ts), dim=2)
+
     def forward(self, batch):
         # batch shape: (num ts, num steps, 1)
         # output shape: (num ts, num steps, num_dirs * hidden_size + 1)
         if len(batch.shape) == 2:
             batch = batch.unsqueeze(2)
         batch = self.zscore(batch)
+        batch = self.lagged(diff, batch, n_lag=1)
         H, (hn, cn) = self.encoder(batch)
         # append to each num steps the observed value as well
         # technically already captured by hidden state, but still
@@ -102,3 +111,11 @@ class ReverseImputer(nn.Module):
     def compute_loss(self, batch_x, batch_y):
         pred_y = self.forward(batch_x)
         return self.loss_fun(pred_y, batch_y)
+
+    def predict_is_imputed(self, ts):
+        self.eval()
+        ts_tensor = torch.tensor(ts).to(torch.float32)
+        with torch.no_grad():
+            scores = self.model(ts_tensor)
+        pred_is_imp = torch.sigmoid(scores) > threshold
+        return pred_is_imp

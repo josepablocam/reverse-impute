@@ -1,3 +1,4 @@
+# Script version in R of generate_ts.py
 source("timeseries.R")
 library("argparse")
 

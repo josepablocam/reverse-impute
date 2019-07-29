@@ -18,35 +18,13 @@ class RepairImpute(object):
     def __init__(self, model):
         self.model = model.eval()
 
-    def predict_is_imputed(self, ts, threshold=0.5):
-        flatten = False
-        if len(ts.shape) == 1:
-            ts = ts.reshape(1, -1)
-            flatten = True
-        ts_tensor = torch.tensor(ts).to(torch.float32)
-        with torch.no_grad():
-            scores = self.model(ts_tensor)
-        pred_is_imp = torch.sigmoid(scores) > threshold
-        flag = pred_is_imp.numpy().astype(bool)
-        if flatten:
-            return flag.flatten()
-
     def remove_imputed(self, ts, threshold=0.5):
-        flatten = False
-        if len(ts.shape) == 1:
-            ts = ts.reshape(1, -1)
-            flatten = True
-        is_imp = self.predict_is_imputed(ts, threshold)
+        is_imp = self.model.predict_is_imputed(ts, threshold)
+        is_imp = is_imp.numpy().astype(bool)
         ts[is_imp] = np.nan
-        if flatten:
-            ts = ts.flatten()
         return ts
 
     def reimpute(self, ts, method, threshold=0.5):
-        flatten = False
-        if len(ts.shape) == 1:
-            flatten = True
-            ts = ts.reshape(1, -1)
         ts_with_missing = self.remove_imputed(ts, threshold)
         nrows = ts_with_missing.shape[0]
         filled = []
@@ -55,5 +33,4 @@ class RepairImpute(object):
             tsf = impute_missing_(tsw, method)
             filled.append(tsf)
         result = np.vstack(filled)
-        if flatten:
-            return result.flatten()
+        return result
