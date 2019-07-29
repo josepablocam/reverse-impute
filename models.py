@@ -83,7 +83,7 @@ class SequenceEncoder(nn.Module):
         if len(batch.shape) == 2:
             batch = batch.unsqueeze(2)
         batch = self.zscore(batch)
-        batch = self.lagged_diff(diff, batch, n_lag=1)
+        batch = self.lagged_diff(batch, n_lag=1)
         H, (hn, cn) = self.encoder(batch)
         # append to each num steps the observed value as well
         # technically already captured by hidden state, but still
