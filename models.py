@@ -72,10 +72,10 @@ class SequenceEncoder(nn.Module):
     def lagged_diff(self, batch, n_lag):
         n_ts = batch.shape[0]
         n_time = batch.shape[1]
-        diffed_ts = batch[n_lag:, :] - batch[:(n_time - n_lag), :]
+        diffed_ts = batch[:, n_lag:] - batch[:, :(n_time - n_lag)]
         # first n differences are zero by definition
-        zeros = torch.zeros((n_ts, n_lag, 1))
-        return torch.cat((zeros, diffed_ts), dim=2)
+        zeros = torch.zeros((n_ts, n_lag, 1)).to(torch.float32).to(batch.device)
+        return torch.cat((zeros, diffed_ts), dim=1)
 
     def forward(self, batch):
         # batch shape: (num ts, num steps, 1)
@@ -112,10 +112,12 @@ class ReverseImputer(nn.Module):
         pred_y = self.forward(batch_x)
         return self.loss_fun(pred_y, batch_y)
 
-    def predict_is_imputed(self, ts):
+    def probability_is_imputed(self, ts):
         self.eval()
         ts_tensor = torch.tensor(ts).to(torch.float32)
         with torch.no_grad():
             scores = self.model(ts_tensor)
-        pred_is_imp = torch.sigmoid(scores) > threshold
-        return pred_is_imp
+        pred_is_imp = torch.sigmoid(scores)
+
+    def predict_is_imputed(self, ts, threshold):
+        return self.probability_is_imputed(ts) > threshold

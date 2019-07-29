@@ -4,11 +4,12 @@ import torch
 import tqdm
 
 
-def summary_classification_stats(y_obs, y_pred):
+def summary_classification_stats(y_obs, y_pred, y_probs):
     return {
         "precision": sklearn.metrics.precision_score(y_obs, y_pred),
         "recall": sklearn.metrics.precision_score(y_obs, y_pred),
         "f1": sklearn.metrics.f1_score(y_obs, y_pred),
+        "auc_score": sklearn.metrics.roc_auc_score(y_obs, y_probs),
     }
 
 
@@ -52,12 +53,13 @@ def evaluate_model(
     return results
 
 
-def compute_ts_stats(repairer, dataset, threshold):
+def compute_ts_stats(model, dataset, threshold):
     df = dataset.df.set_index("unique_id")
     unique_ids = dataset.unique_id
     X = dataset.X
     y = dataset.y
-    yhat = repairer.predict_is_imputed(X, threshold=threshold)
+    yprob = model.probability_is_imputed(X)
+    yhat = yprob > threshold
     nrows = X.shape[0]
     results = []
 
@@ -65,7 +67,7 @@ def compute_ts_stats(repairer, dataset, threshold):
         y_obs = y[i, :]
         y_pred = yhat[i, :]
         subset_df = df.loc[unique_ids[i]]
-        info = summary_classification_stats(y_obs, y_pred)
+        info = summary_classification_stats(y_obs, y_pred, y_probs)
         info["unique_id"] = unique_ids[i]
         info["impute_method"] = subset_df.method.values[0]
         info["orig_mse"] = sklearn.metrics.mean_squared_error(
@@ -77,7 +79,7 @@ def compute_ts_stats(repairer, dataset, threshold):
 
 
 def summarize_ts_stats(df):
-    return df.groupby("impute_method")[["f1", "precision", "recall", "orig_mse"]].mean()
+    return df.groupby("impute_method")[["f1", "precision", "recall", "auc", "orig_mse"]].mean()
 
 
 # def compute_per_ts_stats(
