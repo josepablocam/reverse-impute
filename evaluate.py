@@ -14,10 +14,9 @@ def summary_classification_stats(y_obs, y_pred, y_probs):
     }
 
 
-def evaluate_model(
+def scan_for_max_f1(
         model,
         dataset,
-        max_f1=True,
 ):
     cpu = torch.device("cpu")
     model = model.to(cpu)
@@ -31,24 +30,25 @@ def evaluate_model(
         X = X.to(cpu)
 
     y_probs = model.probability_is_imputed(X)
-    y_probs = y_probs.numpy().flatten()
+    if not instance(y_probs, np.ndarray):
+        y_probs = y_probs.numpy()
+    y_probs = y_probs.flatten()
     y = y.flatten()
 
     results = {}
     results["auc"] = sklearn.metrics.roc_auc_score(y, y_probs)
 
-    if max_f1:
-        best_f1 = None
-        best_thresh = None
-        for thresh in tqdm.tqdm(np.arange(0.0, 1.0, 0.01)):
-            y_hat = y_probs > thresh
-            f1 = sklearn.metrics.f1_score(y, y_hat)
-            if best_f1 is None or f1 > best_f1:
-                best_f1 = f1
-                best_thresh = thresh
-        results["best_threshold"] = best_thresh
-        y_hat_best = y_probs > best_thresh
-        results.update(summary_classification_stats(y, y_hat_best, y_probs))
+    best_f1 = None
+    best_thresh = None
+    for thresh in tqdm.tqdm(np.arange(0.0, 1.0, 0.01)):
+        y_hat = y_probs > thresh
+        f1 = sklearn.metrics.f1_score(y, y_hat)
+        if best_f1 is None or f1 > best_f1:
+            best_f1 = f1
+            best_thresh = thresh
+    results["best_threshold"] = best_thresh
+    y_hat_best = y_probs > best_thresh
+    results.update(summary_classification_stats(y, y_hat_best, y_probs))
     return results
 
 
@@ -57,12 +57,9 @@ def compute_ts_stats(model, dataset, threshold):
     unique_ids = dataset.unique_id
     X = dataset.X
     y = dataset.y
-    try:
-        y_probs = model.probability_is_imputed(X)
-    except AttributeError:
-        with torch.no_grad():
-            y_probs = model(torch.tensor(X).to(torch.float32))
-            y_probs = torch.sigmoid(y_probs)
+    y_probs = model.probability_is_imputed(X)
+    if not isinstance(y_probs, np.ndarray):
+        y_probs = y_probs.numpy()
     y_hat = y_probs > threshold
     nrows = X.shape[0]
     results = []
