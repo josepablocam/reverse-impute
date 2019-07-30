@@ -50,19 +50,42 @@ class MissingPredictor(nn.Module):
 
 class AttentionBasedSummarizer(nn.Module):
     def __init__(self, hidden_size):
-        self.w = nn.Linear(hidden_size, 1)
+        super().__init__()
+        # add one in size, since we append index of timestep
+        self.w = nn.Linear(hidden_size + 1, 1)
 
-    def compute_attention_weights(self, H):
-        alpha = torch.softmax(self.w(torch.tanh(H)))
+    def repeat_hidden_state_matrix(self, H):
+        # H shape: (num ts, num steps, bilstm hidden size)
+        # repeat same set of hidden vectors for each time step
+        # H_ext shape: (num ts, num steps, num steps, bilstm hidden size)
+        num_obs, num_steps = H.shape[:2]
+        H_ext = H.unsqueeze(1).repeat(1, num_steps, 1, 1)
+        return H_ext
+
+    def compute_attention_weights(self, H_ext):
+        # H_ext shape: (num ts, num steps, num steps, bilstm hidden size)
+        # alpha shape: (num ts, num steps, num_steps, 1)
+        # append an index indicating what time step to each
+        num_obs, num_steps = H_ext.shape[:2]
+        ixs = torch.arange(0, num_steps, dtype=torch.float32)
+        ixs = ixs.reshape(-1, 1).repeat(1, num_steps).unsqueeze(-1)
+        ixs = ixs.unsqueeze(0).repeat(num_obs, 1, 1, 1)
+        # append time step index to end of each H entry
+        H_ext_with_ix = torch.cat((H_ext, ixs), dim=-1)
+        alpha = torch.softmax(self.w(H_ext_with_ix), dim=2)
         return alpha
 
     def summarize(self, H):
-        alpha = self.compute_attention_weights(H)
-        return torch.sum(H * alpha)
+        # H shape: (num ts, num steps, bilstm hidden size)
+        # output shape: (num ts, num steps, bilstm hidden size)
+        H_ext = self.repeat_hidden_state_matrix(H)
+        alpha = self.compute_attention_weights(H_ext)
+        weighted_H_ext = (alpha * H_ext).sum(dim=2)
+        return weighted_H_ext
 
 
 class SequenceEncoder(nn.Module):
-    def __init__(self, hidden_size, encoder_type="bilstm"):
+    def __init__(self, hidden_size, encoder_type="bilstm", attention=True):
         super().__init__()
 
         if encoder_type == "bilstm":
@@ -73,6 +96,9 @@ class SequenceEncoder(nn.Module):
                 batch_first=True,
                 bidirectional=True,
             )
+            self.attention = None
+            if attention:
+                self.attention = AttentionBasedSummarizer(hidden_size * 2)
         else:
             raise Exception("Unknown model type: {}".format(encoder_type))
 
@@ -98,20 +124,23 @@ class SequenceEncoder(nn.Module):
         if len(batch.shape) == 2:
             batch = batch.unsqueeze(2)
         batch = self.zscore(batch)
-        # batch = self.lagged_diff(batch, n_lag=1)
+        batch = self.lagged_diff(batch, n_lag=1)
         H, (hn, cn) = self.encoder(batch)
         # append to each num steps the observed value as well
         # technically already captured by hidden state, but still
         # adding
+        if self.attention is not None:
+            H = self.attention.summarize(H)
         return torch.cat((H, batch), dim=2)
 
 
 class ReverseImputer(nn.Module):
-    def __init__(self, enc_hidden_size, pred_hidden_size):
+    def __init__(self, enc_hidden_size, pred_hidden_size, attention=False):
         super().__init__()
         self.encoder = SequenceEncoder(
             enc_hidden_size,
             encoder_type="bilstm",
+            attention=attention,
         )
         self.predictor = MissingPredictor(
             input_size=enc_hidden_size * 2 + 1,
@@ -131,8 +160,9 @@ class ReverseImputer(nn.Module):
         self.eval()
         ts_tensor = torch.tensor(ts).to(torch.float32)
         with torch.no_grad():
-            scores = self.model(ts_tensor)
+            scores = self.forward(ts_tensor)
         pred_is_imp = torch.sigmoid(scores)
+        return pred_is_imp
 
     def predict_is_imputed(self, ts, threshold):
         return self.probability_is_imputed(ts) > threshold
