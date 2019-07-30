@@ -48,6 +48,19 @@ class MissingPredictor(nn.Module):
         return self.layers(batch).squeeze(2)
 
 
+class AttentionBasedSummarizer(nn.Module):
+    def __init__(self, hidden_size):
+        self.w = nn.Linear(hidden_size, 1)
+
+    def compute_attention_weights(self, H):
+        alpha = torch.softmax(self.w(torch.tanh(H)))
+        return alpha
+
+    def summarize(self, H):
+        alpha = self.compute_attention_weights(H)
+        return torch.sum(H * alpha)
+
+
 class SequenceEncoder(nn.Module):
     def __init__(self, hidden_size, encoder_type="bilstm"):
         super().__init__()
@@ -74,7 +87,9 @@ class SequenceEncoder(nn.Module):
         n_time = batch.shape[1]
         diffed_ts = batch[:, n_lag:] - batch[:, :(n_time - n_lag)]
         # first n differences are zero by definition
-        zeros = torch.zeros((n_ts, n_lag, 1)).to(torch.float32).to(batch.device)
+        zeros = torch.zeros((n_ts, n_lag, 1)).to(torch.float32).to(
+            batch.device
+        )
         return torch.cat((zeros, diffed_ts), dim=1)
 
     def forward(self, batch):

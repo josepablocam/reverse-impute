@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 
 import pandas as pd
 from rpy2 import robjects
-from rpy2.robjects import pandas2ri
+from rpy2.robjects import pandas2ri, numpy2ri
 from rpy2.robjects.packages import importr
 import numpy as np
 import torch
@@ -20,12 +20,12 @@ class GreedyMSEMinimizer(object):
     def __init__(self, model):
         self.model = model.eval()
 
-    def predict_is_imputed(self, X):
+    def predict_is_imputed(self, X, step_size):
         probs = self.model.probability_is_imputed(X)
         probs = probs.numpy()
         acc = []
         for i in tqdm.tqdm(range(0, probs.shape[0])):
-            result = minimize_mse_(probs[i, :])
+            result = minimize_mse_(X[i, :], probs[i, :], step_size)
             result = zip(result.names, result.values)
             acc.append(result)
         df = pd.DataFrame(acc)

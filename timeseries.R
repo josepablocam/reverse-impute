@@ -138,7 +138,7 @@ minimize_mse <- function(vec, probs, step_size, methods=NULL) {
       if (is.null(curr_min_mse) || (min_iter_mse < curr_min_mse)) {
         improved <- TRUE
         curr_min_mse <- min_iter_mse
-        curr_min_mse_method <- methods[which(min_iter_mse == iter_mse)]
+        curr_min_mse_method <- methods[which(min_iter_mse == iter_mse)[1]]
         curr_min_thresh <- thresh
         curr_predicted <- is.na(copy_vec)
       }
