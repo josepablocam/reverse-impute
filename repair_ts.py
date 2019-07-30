@@ -15,11 +15,12 @@ rinterpreter.source("timeseries.R")
 impute_missing_ = rinterpreter("impute_missing")
 minimize_mse_ = rinterpreter("minimize_mse")
 
+
 class GreedyMSEMinimizer(object):
     def __init__(self, model):
         self.model = model.eval()
 
-    def predict_imputed(self, X):
+    def predict_is_imputed(self, X):
         probs = self.model.probability_is_imputed(X)
         probs = probs.numpy()
         acc = []
@@ -32,7 +33,7 @@ class GreedyMSEMinimizer(object):
 
     def probability_is_imputed(self, X):
         # prob == 1.0 if we predict it, just for easy evaluation
-        df = self.predict_imputed(self, X)
+        df = self.predict_is_imputed(self, X)
         return df.predicted.values.astype(float)
 
 
