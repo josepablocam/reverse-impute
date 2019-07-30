@@ -125,6 +125,7 @@ minimize_mse <- function(vec, probs, step_size, methods=NULL) {
   pb_bar <- progress_bar$new(total=total_iters)
   history_mse <- c()
   history_thresh <- c()
+  num_iters <- 0
 
   while (thresh > 0.0) {
       copy_vec <- vec
@@ -154,7 +155,8 @@ minimize_mse <- function(vec, probs, step_size, methods=NULL) {
         curr_predicted <- is.na(copy_vec)
       }
       thresh <- thresh - step_size
+      num_iters <- num_iters + 1
       pb_bar$tick()
   }
-  list(mse=curr_min_mse, method=curr_min_mse_method, threshold=curr_min_thresh, predicted=curr_predicted)
+  list(mse=curr_min_mse, method=curr_min_mse_method, threshold=curr_min_thresh, predicted=curr_predicted, num_iters=num_iters, history_mse=history_mse, history_thresh=history_thresh)
 }
