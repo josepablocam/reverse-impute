@@ -118,13 +118,14 @@ minimize_mse <- function(vec, probs, step_size, methods=NULL) {
   thresh <- max(probs)
   curr_min_mse <- NULL
   curr_min_mse_method <- NULL
-  curr_min_thresh <- NULL
-  curr_predicted <- NULL
+  curr_min_thresh <- thresh
+  curr_predicted <- rep(FALSE, length(vec))
+  improved <- TRUE
 
   total_iters <- ceiling(thresh / step_size)
   pb_bar <- progress_bar$new(total=total_iters)
 
-  while ((is.null(curr_min_mse) || improved) && thresh > 0.0) {
+  while (improved && thresh > 0.0) {
       improved <- FALSE
       copy_vec <- vec
       copy_vec[probs >= thresh] <- NA
@@ -144,7 +145,7 @@ minimize_mse <- function(vec, probs, step_size, methods=NULL) {
           break
       }
       min_iter_mse <- min(iter_mse)
-      if (is.null(curr_min_mse) || (min_iter_mse < curr_min_mse)) {
+      if (is.null(curr_min_mse) || (min_iter_mse <= curr_min_mse)) {
         improved <- TRUE
         curr_min_mse <- min_iter_mse
         curr_min_mse_method <- methods[which(min_iter_mse == iter_mse)[1]]

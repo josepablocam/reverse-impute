@@ -3,6 +3,7 @@ import numpy as np
 import sklearn.metrics
 import torch
 import tqdm
+import pandas as pd
 
 
 def summary_classification_stats(y_obs, y_pred, y_probs):
@@ -97,10 +98,11 @@ def visualize(model, threshold, df, method=None, unique_id=None, seed=None):
         unique_id = np.random.choice(df.unique_id.unique(), 1)[0]
     df = df[df["unique_id"] == unique_id]
 
-    with torch.no_grad():
-        filled = torch.tensor(df.filled.values.reshape(1, -1)).to(torch.float32)
-        y_probs = model(filled)
-        y_probs = torch.sigmoid(y_probs).numpy().flatten()
+    X = torch.tensor(df.filled.values).to(torch.float32)
+    y_probs = model.probability_is_imputed(X)
+    if not isinstance(y_probs, np.ndarray):
+        y_probs = y_probs.numpy()
+    y_probs = y_probs.flatten()
     y_hat = y_probs > threshold
 
     axes[0].plot(df.orig.values, label="Ground Truth")

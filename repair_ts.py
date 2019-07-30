@@ -50,6 +50,9 @@ class GreedyMSEMinimizer(nn.Module):
         yhat = self.predict_is_imputed(X, step_size, extra_info=False)
         return yhat.astype(float)
 
+    def forward(self, X, step_size=None):
+        return self.probability_is_imputed(X, step_size=step_size)
+
 
 class RepairImpute(object):
     def __init__(self, model):
