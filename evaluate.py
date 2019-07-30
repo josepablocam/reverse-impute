@@ -31,7 +31,7 @@ def scan_for_max_f1(
         X = X.to(cpu)
 
     y_probs = model.probability_is_imputed(X)
-    if not instance(y_probs, np.ndarray):
+    if not isinstance(y_probs, np.ndarray):
         y_probs = y_probs.numpy()
     y_probs = y_probs.flatten()
     y = y.flatten()
