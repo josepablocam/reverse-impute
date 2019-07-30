@@ -6,12 +6,34 @@ from rpy2.robjects import pandas2ri
 from rpy2.robjects.packages import importr
 import numpy as np
 import torch
+import tqdm
 
 pandas2ri.activate()
 rinterpreter = robjects.r
 rinterpreter.source("timeseries.R")
 
 impute_missing_ = rinterpreter("impute_missing")
+minimize_mse_ = rinterpreter("minimize_mse")
+
+class GreedyMSEMinimizer(object):
+    def __init__(self, model):
+        self.model = model.eval()
+
+    def predict_imputed(self, X):
+        probs = self.model.probability_is_imputed(X)
+        probs = probs.numpy()
+        acc = []
+        for i in tqdm.tqdm(range(0, probs.shape[0])):
+            result = minimize_mse_(probs[i, :])
+            result = zip(result.names, result.values)
+            acc.append(result)
+        df = pd.DataFrame(acc)
+        return df
+
+    def probability_is_imputed(self, X):
+        # prob == 1.0 if we predict it, just for easy evaluation
+        df = self.predict_imputed(self, X)
+        return df.predicted.values.astype(float)
 
 
 class RepairImpute(object):
