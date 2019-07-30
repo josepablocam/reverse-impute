@@ -18,11 +18,14 @@ minimize_mse_ = rinterpreter("minimize_mse")
 
 
 class GreedyMSEMinimizer(nn.Module):
-    def __init__(self, model):
+    def __init__(self, model, step_size=0.1):
         super().__init__()
         self.model = model.eval()
+        self.step_size = step_size
 
-    def predict_is_imputed(self, X, step_size, extra_info=False):
+    def predict_is_imputed(self, X, step_size=None, extra_info=False):
+        if step_size is None:
+            step_size = self.step_size
         probs = self.model.probability_is_imputed(X)
         probs = probs.numpy()
         acc = []
@@ -30,7 +33,7 @@ class GreedyMSEMinimizer(nn.Module):
             v = pd.Series(X[i, :])
             p = pd.Series(probs[i, :])
             result = minimize_mse_(v, p, step_size)
-            result = {k: numpy2ri.ri2py(v) for v in result.items()}
+            result = {k: numpy2ri.ri2py(v) for k, v in result.items()}
             result = {k: v[0] if len(v) == 1 else v for k, v in result.items()}
             acc.append(result)
         df = pd.DataFrame(acc)
@@ -40,9 +43,11 @@ class GreedyMSEMinimizer(nn.Module):
         else:
             return yhat
 
-    def probability_is_imputed(self, X):
+    def probability_is_imputed(self, X, step_size=None):
         # prob == 1.0 if we predict it, just for easy evaluation
-        yhat = self.predict_is_imputed(self, X, extra_info=False)
+        if step_size is None:
+            step_size = self.step_size
+        yhat = self.predict_is_imputed(X, step_size, extra_info=False)
         return yhat.astype(float)
 
 
