@@ -98,7 +98,7 @@ def visualize(model, threshold, df, method=None, unique_id=None, seed=None):
         unique_id = np.random.choice(df.unique_id.unique(), 1)[0]
     df = df[df["unique_id"] == unique_id]
 
-    X = torch.tensor(df.filled.values).to(torch.float32)
+    X = torch.tensor(df.filled.values.reshape(1, -1)).to(torch.float32)
     y_probs = model.probability_is_imputed(X)
     if not isinstance(y_probs, np.ndarray):
         y_probs = y_probs.numpy()
