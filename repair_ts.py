@@ -20,16 +20,23 @@ class GreedyMSEMinimizer(object):
     def __init__(self, model):
         self.model = model.eval()
 
-    def predict_is_imputed(self, X, step_size):
+    def predict_is_imputed(self, X, step_size, extra_info=False):
         probs = self.model.probability_is_imputed(X)
         probs = probs.numpy()
         acc = []
         for i in tqdm.tqdm(range(0, probs.shape[0])):
-            result = minimize_mse_(X[i, :], probs[i, :], step_size)
-            result = zip(result.names, result.values)
+            v = pd.Series(X[i, :])
+            p = pd.Series(probs[i, :])
+            result = minimize_mse_(v, p, step_size)
+            result = {k: numpy2ri.ri2py(v) for v in result.items()}
+            result = {k: v[0] if len(v) == 1 else v for k, v in result.items()}
             acc.append(result)
         df = pd.DataFrame(acc)
-        return df
+        yhat = np.array([e for e in df.predicted.values])
+        if extra_info:
+            return yhat, df
+        else:
+            return yhat
 
     def probability_is_imputed(self, X):
         # prob == 1.0 if we predict it, just for easy evaluation
