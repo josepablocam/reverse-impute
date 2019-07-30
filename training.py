@@ -32,6 +32,14 @@ class TSDataset(data.Dataset):
             torch.tensor(chosen_y).to(torch.float32)
         )
 
+    def sample(self, n, seed=None):
+        if seed is not None:
+            np.random.seed(seed)
+        unique_ids = np.random.choice(self.unique_id, n)
+        sampled_df = self.df[self.df.unique_id.isin(unique_ids)]
+        sampled_df = sampled_df.reset_index(drop=True)
+        return TSDataset(sampled_df)
+
 
 def get_data(df, frac_valid, frac_test, seed=None):
     if isinstance(df, str):
