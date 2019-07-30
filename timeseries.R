@@ -123,6 +123,8 @@ minimize_mse <- function(vec, probs, step_size, methods=NULL) {
 
   total_iters <- ceiling(thresh / step_size)
   pb_bar <- progress_bar$new(total=total_iters)
+  history_mse <- c()
+  history_thresh <- c()
 
   while (thresh > 0.0) {
       copy_vec <- vec
@@ -143,6 +145,8 @@ minimize_mse <- function(vec, probs, step_size, methods=NULL) {
           break
       }
       min_iter_mse <- min(iter_mse)
+      history_mse <- c(history_mse, min_iter_mse)
+      history_thresh <- c(history_thresh, thresh)
       if (is.null(curr_min_mse) || (min_iter_mse <= curr_min_mse)) {
         curr_min_mse <- min_iter_mse
         curr_min_mse_method <- methods[which(min_iter_mse == iter_mse)[1]]
