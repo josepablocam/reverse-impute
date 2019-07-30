@@ -103,3 +103,41 @@ generate_dataset <- function(num_ts, num_obs=200, probs=c(0.2), methods=c("mean"
     }
     do.call(rbind, all_generated)
 }
+
+
+get_mse <- function(v1, v2) {
+    mean((v1 - v2) ^ 2)
+}
+
+
+minimize_mse <- function(vec, probs, step_size, methods=NULL) {
+  if (is.null(methods)) {
+    methods <- names(AVAILABLE_IMPUTATION_METHODS)
+  }
+
+  thresh <- max(probs)
+  curr_min_mse <- NULL
+  curr_min_mse_method <- NULL
+  curr_min_thresh <- NULL
+
+  while ((is.null(curr_min_mse) || improved) && thresh > 0.0) {
+      improved <- FALSE
+      copy_vec <- vec
+      copy_vec[probs >= thresh] <- NA
+      iter_mse <- c()
+      for (method in methods) {
+          filled_vec <- impute_missing(copy_vec, method)
+          method_mse <- get_mse(vec, filled_vec)
+          iter_mse <- c(iter_mse, method_mse)
+      }
+      min_iter_mse <- min(iter_mse)
+      if (is.null(curr_min_mse) || (min_iter_mse < curr_min_mse)) {
+        improved <- TRUE
+        curr_min_mse <- min_iter_mse
+        curr_min_mse_method <- methods[which(min_iter_mse == iter_mse)]
+        curr_min_thresh <- thresh
+      }
+      thresh <- thresh - step_size
+  }
+  list(mse=curr_min_mse, method=curr_min_mse_method, threshold=curr_min_thresh)
+}
