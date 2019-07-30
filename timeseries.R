@@ -129,10 +129,19 @@ minimize_mse <- function(vec, probs, step_size, methods=NULL) {
       copy_vec <- vec
       copy_vec[probs >= thresh] <- NA
       iter_mse <- c()
-      for (method in methods) {
-          filled_vec <- impute_missing(copy_vec, method)
-          method_mse <- get_mse(vec, filled_vec)
-          iter_mse <- c(iter_mse, method_mse)
+      for(method in methods) {
+          filled_vec <- tryCatch(
+            {impute_missing(copy_vec, method)},
+            error = function(e) NULL
+          )
+          if (!is.null(filled_vec)) {
+              method_mse <- get_mse(vec, filled_vec)
+              iter_mse <- c(iter_mse, method_mse)
+          }
+      }
+      if (length(iter_mse) == 0) {
+          # all methods failed to impute, too many missing values
+          break
       }
       min_iter_mse <- min(iter_mse)
       if (is.null(curr_min_mse) || (min_iter_mse < curr_min_mse)) {
