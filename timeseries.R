@@ -121,8 +121,6 @@ minimize_mse <- function(vec, probs, step_size, methods=NULL) {
   curr_min_thresh <- thresh
   curr_predicted <- rep(FALSE, length(vec))
 
-  total_iters <- ceiling(thresh / step_size)
-  pb_bar <- progress_bar$new(total=total_iters)
   history_mse <- c()
   history_thresh <- c()
   num_iters <- 0
@@ -156,7 +154,6 @@ minimize_mse <- function(vec, probs, step_size, methods=NULL) {
       }
       thresh <- thresh - step_size
       num_iters <- num_iters + 1
-      pb_bar$tick()
   }
   list(mse=curr_min_mse, method=curr_min_mse_method, threshold=curr_min_thresh, predicted=curr_predicted, num_iters=num_iters, history_mse=history_mse, history_thresh=history_thresh)
 }
