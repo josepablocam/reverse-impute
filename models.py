@@ -67,7 +67,7 @@ class AttentionBasedSummarizer(nn.Module):
         # alpha shape: (num ts, num steps, num_steps, 1)
         # append an index indicating what time step to each
         num_obs, num_steps = H_ext.shape[:2]
-        ixs = torch.arange(0, num_steps, dtype=torch.float32)
+        ixs = torch.arange(0, num_steps, dtype=torch.float32).to(H_ext.device)
         ixs = ixs.reshape(-1, 1).repeat(1, num_steps).unsqueeze(-1)
         ixs = ixs.unsqueeze(0).repeat(num_obs, 1, 1, 1)
         # append time step index to end of each H entry
