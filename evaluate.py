@@ -53,6 +53,36 @@ def scan_for_max_f1(
     return results
 
 
+def upper_limit_performance(
+        model,
+        dataset,
+):
+    df = dataset.df.set_index("unique_id")
+    unique_ids = dataset.unique_id
+    X = dataset.X
+    y = dataset.y
+    y_probs = model.probability_is_imputed(X)
+    if not isinstance(y_probs, np.ndarray):
+        y_probs = y_probs.numpy()
+    nrows = X.shape[0]
+    results = []
+
+    for i in tqdm.tqdm(range(nrows)):
+        y_i = y[i, :]
+        y_probs_i = y_probs[i, :]
+        max_f1 = max([
+            sklearn.metrics.f1_score(y_i, y_probs_i > threshold)
+            for threshold in np.linspace(0, 1.0, 11)
+        ],
+        )
+        info = {}
+        subset_df = df.loc[unique_ids[i]]
+        info["impute_method"] = subset_df.method.values[0]
+        info["max_f1"] = max_f1
+        results.append(info)
+    return pd.DataFrame(results)
+
+
 def compute_ts_stats(model, dataset, threshold):
     df = dataset.df.set_index("unique_id")
     unique_ids = dataset.unique_id
