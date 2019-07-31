@@ -17,6 +17,7 @@ def setup():
     R("install.packages('forecast')")
     R("install.packages('tsoutliers')")
     bash("pip install tensorboardX")
+    bash("pip install quandl")
 
 
 if __name__ == "__main__":
