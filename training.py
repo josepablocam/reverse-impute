@@ -35,7 +35,9 @@ class TSDataset(data.Dataset):
     def sample(self, n, seed=None):
         if seed is not None:
             np.random.seed(seed)
-        unique_ids = np.random.choice(self.unique_id, n)
+        unique_ids = self.unique_id.copy()
+        np.random.shuffle(unique_ids)
+        unique_ids = unique_ids[:n]
         sampled_df = self.df[self.df.unique_id.isin(unique_ids)]
         sampled_df = sampled_df.reset_index(drop=True)
         return TSDataset(sampled_df)
