@@ -8,7 +8,6 @@ METHODS="mean median \
   spline_interpolation stine_interpolation \
   kalman_arima"
 
-
 # Generate synthetic data
 Rscript generate_ts.R \
   --num_ts 1000 \
@@ -31,7 +30,6 @@ Rscript generate_ts.R \
   --seed 42 \
   --output sp500_prices_with_missing.csv
 
-
 # Train model on synthetic data
 python train.py \
   --input generated.csv \
@@ -44,9 +42,18 @@ python train.py \
   --valid_every_n_batches 10 \
   --seed 42
 
-# Compute table with different methods
+# Compute synthetic data results with different methods
 python evaluate.py \
     --input exp1/dataset.pkl \
     --model exp1/model.pth \
     --baselines tsoutliers tsclean manual \
-    --output exp1/results.csv
+    --output exp1/generated-results.csv
+
+# Compute results on sp500 prices
+python evaluate.py \
+    --csv sp500_prices_with_missing.csv \
+    --valid 0.5 \
+    --test 0.5 \
+    --model exp1/model.pth \
+    --baselines tsoutliers tsclean manual \
+    --output exp1/sp500-results.csv

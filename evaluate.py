@@ -8,7 +8,7 @@ import tqdm
 import pandas as pd
 
 import models
-from training import TSDataset
+from training import TSDataset, get_data
 
 
 def summary_classification_stats(y_obs, y_pred, y_probs, stats=None):
@@ -199,12 +199,39 @@ def run_evaluation(ts_data, model, baselines):
         results.append(baseline_results)
     df = pd.DataFrame(results)
 
+
 def get_args():
     parser = ArgumentParser(description="Run evaluation")
-    parser.add_argument("-i", "--input", type=str, help="Path to dataset splits")
-    parser.add_argument("-m", "--model", type=str, help="Path to trained model")
-    parser.add_argument("-b", "--baselines", type=str, nargs="+", help="Baselines to compare")
-    parser.add_argument("-o", "--output", type=str, help="Output df with results")
+    parser.add_argument(
+        "-d", "--dataset", type=str, help="Path to dataset splits"
+    )
+    parser.add_argument("-c", "--csv", type=str, help="Path to csv of dataset")
+    parser.add_argument(
+        "-v",
+        "--valid",
+        type=float,
+        help="Fraction of csv for validation",
+        default=0.5
+    )
+    parser.add_argument(
+        "-t",
+        "--test",
+        type=float,
+        help="Fraction of csv for test",
+        default=0.5
+    )
+    parser.add_argument(
+        "-s", "--seed", type=int, help="RNG seed to split dataset", default=42
+    )
+    parser.add_argument(
+        "-m", "--model", type=str, help="Path to trained model"
+    )
+    parser.add_argument(
+        "-b", "--baselines", type=str, nargs="+", help="Baselines to compare"
+    )
+    parser.add_argument(
+        "-o", "--output", type=str, help="Output df with results"
+    )
     return parser.parse_args()
 
 
@@ -218,11 +245,16 @@ def main():
         "manual": get_manual_baseline(),
     }
     if args.baselines is not None:
-        baselines = {k:m for k, m in baselines.items() if k in args.baselines}
-    with open(args.input, "rb") as fin:
-        ts_data = pickle.load(fin)
-    df = run_evaluation(ts_data, model, baselines)
-    df.to_csv(args.output)
+        baselines = {k: m for k, m in baselines.items() if k in args.baselines}
+    if args.dataset is not None:
+        with open(args.input, "rb") as fin:
+            ts_data = pickle.load(fin)
+    elif args.csv is not None:
+        df = pd.read_csv(args.csv)
+        ts_data = get_data(df, args.valid, args.test, seed=args.seed)
+    results_df = run_evaluation(ts_data, model, baselines)
+    results_df.to_csv(args.output)
+
 
 if __name__ == "__main__":
     try:
