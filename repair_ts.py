@@ -90,7 +90,7 @@ class ManualBaseline(ModelWrapper):
         super().__init__()
         self.default_threshold = threshold
 
-    def fit(self, X, y):
+    def fit(self, X, y, n_steps=10):
         y = y.flatten()
         best_f1 = None
         best_threshold = None
