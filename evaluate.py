@@ -17,9 +17,9 @@ def summary_classification_stats(y_obs, y_pred, y_probs, stats=None):
         stats = ["precision", "recall", "f1", "auc"]
     stat_funs = {
         "precision": lambda x: sklearn.metrics.precision_score(x[0], x[1]),
-        "recall": lambda x: sklearn.metrics.precision_score(x[0], x[1]),
-        "f1": lambda x: sklearn.metrics.precision_score(x[0], x[1]),
-        "auc": lambda x: sklearn.metrics.precision_score(x[0], x[2]),
+        "recall": lambda x: sklearn.metrics.recall_score(x[0], x[1]),
+        "f1": lambda x: sklearn.metrics.f1_score(x[0], x[1]),
+        "auc": lambda x: sklearn.metrics.roc_auc_score(x[0], x[2]),
     }
     results = {}
     for stat_name in stats:
@@ -45,7 +45,7 @@ def scan_for_max_f1(
 
     y_probs = model.probability_is_imputed(X)
     if not isinstance(y_probs, np.ndarray):
-        y_probs = y_probs.numpy()
+        y_probs = y_probs.cpu().numpy()
     y_probs = y_probs.flatten()
     y = y.flatten()
 
@@ -76,7 +76,7 @@ def upper_limit_performance(
     y = dataset.y
     y_probs = model.probability_is_imputed(X)
     if not isinstance(y_probs, np.ndarray):
-        y_probs = y_probs.numpy()
+        y_probs = y_probs.cpu().numpy()
     nrows = X.shape[0]
     results = []
 
@@ -110,7 +110,7 @@ def compute_ts_stats(model, dataset, threshold):
     y = dataset.y
     y_probs = model.probability_is_imputed(X)
     if not isinstance(y_probs, np.ndarray):
-        y_probs = y_probs.numpy()
+        y_probs = y_probs.cpu().numpy()
     y_hat = y_probs > threshold
     nrows = X.shape[0]
     results = []
@@ -151,7 +151,7 @@ def visualize(model, threshold, df, method=None, unique_id=None, seed=None):
     X = torch.tensor(df.filled.values.reshape(1, -1)).to(torch.float32)
     y_probs = model.probability_is_imputed(X)
     if not isinstance(y_probs, np.ndarray):
-        y_probs = y_probs.numpy()
+        y_probs = y_probs.cpu().numpy()
     y_probs = y_probs.flatten()
     y_hat = y_probs > threshold
 
