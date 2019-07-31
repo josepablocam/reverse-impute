@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+import pickle
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -252,8 +253,10 @@ def main():
     elif args.csv is not None:
         df = pd.read_csv(args.csv)
         ts_data = get_data(df, args.valid, args.test, seed=args.seed)
+        with open(os.path.join(args.output, "eval-dataset.pkl"), "wb") as fout:
+            pickle.dump(ts_data, fout)
     results_df = run_evaluation(ts_data, model, baselines)
-    results_df.to_csv(args.output)
+    results_df.to_csv(os.path.join(args.output, "eval-results.csv"))
 
 
 if __name__ == "__main__":

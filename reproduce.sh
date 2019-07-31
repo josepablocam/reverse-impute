@@ -33,7 +33,7 @@ Rscript generate_ts.R \
 # Train model on synthetic data
 python train.py \
   --input generated.csv \
-  --output exp1/ \
+  --output train-results/ \
   --valid 0.2 \
   --test 0.1 \
   --hidden 50 \
@@ -44,10 +44,10 @@ python train.py \
 
 # Compute synthetic data results with different methods
 python evaluate.py \
-    --input exp1/dataset.pkl \
-    --model exp1/model.pth \
+    --input train-results/dataset.pkl \
+    --model train-results/model.pth \
     --baselines tsoutliers tsclean manual \
-    --output exp1/generated-results.csv
+    --output eval-synthetic-results/generated-results.csv
 
 # Compute results on sp500 prices
 python evaluate.py \
@@ -56,4 +56,17 @@ python evaluate.py \
     --test 0.5 \
     --model exp1/model.pth \
     --baselines tsoutliers tsclean manual \
-    --output exp1/sp500-results.csv
+    --output eval-sp500-results/sp500-results.csv
+
+# Compute MSE impact for future forecasts
+python repair_ts.py \
+  --dataset eval-sp500-results/eval-dataset.pkl \
+  --model train-results/model.pth \
+  --hidden_size 50 \
+  --output eval-sp500-results/predicted-imputed-sp500.csv
+
+Rscript forecast_impact.R \
+  --orig_data sp500_prices_with_missing.csv \
+  --new_data eval-sp500-results/predicted-imputed-sp500.csv \
+  --n_first 100 \
+  --output eval-sp500-results/forecast-impact.csv \
