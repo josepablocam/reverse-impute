@@ -8,6 +8,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import tqdm
+from sklearn.metrics import f1_score
 
 pandas2ri.activate()
 rinterpreter = robjects.r
@@ -87,13 +88,30 @@ class RBaseline(ModelWrapper):
 class ManualBaseline(ModelWrapper):
     def __init__(self, threshold=0.2):
         super().__init__()
-        self.threshold = threshold
+        self.default_threshold = threshold
 
-    def probability_is_imputed(self, X, **kwargs):
+    def fit(self, X, y):
+        y = y.flatten()
+        best_f1 = None
+        best_threshold = None
+
+        for threshold in tqdm.tqdm(np.linspace(0, 1, n_steps + 1)):
+            yhat = self.probability_is_imputed(X, threshold=threshold)
+            yhat = yhat.flatten()
+            f1 = f1_score(y, yhat)
+            if best_f1 is None or f1 > best_f1:
+                best_f1 = f1
+                best_threshold = threshold
+        self.default_threshold = best_threshold
+        return self
+
+    def probability_is_imputed(self, X, threshold=None, **kwargs):
         zero_or_ones = (X == 0) | (X == 1)
         nrows = X.shape[0]
         nsteps = X.shape[1]
         preds = []
+        if threshold is None:
+            threshold = self.default_threshold
         for i in tqdm.tqdm(range(0, nrows)):
             row = X[i, :]
             row_indicator = np.repeat(False, nsteps)
@@ -111,7 +129,7 @@ class ManualBaseline(ModelWrapper):
             # large difference in values
             abs_pct_diffs = np.abs(row_1_to_n - row_0_to_n_minus_1
                                    ) / np.abs(row_0_to_n_minus_1)
-            possible_shift = np.append([False], abs_pct_diffs > self.threshold)
+            possible_shift = np.append([False], abs_pct_diffs > threshold)
             row_indicator |= possible_shift
             preds.append(row_indicator)
         preds = np.array(preds)
@@ -124,3 +142,7 @@ def get_tsoutliers_baseline():
 
 def get_tsclean_baseline():
     return RBaseline(forecast_tsclean_)
+
+
+def get_manual_baseline(threshold=0.2):
+    return ManualBaseline(threshold)
