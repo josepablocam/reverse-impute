@@ -79,10 +79,10 @@ class RBaseline(ModelWrapper):
 
 
 def get_tsoutliers_baseline():
-    RBaseline(ts_outliers_)
+    return RBaseline(ts_outliers_)
 
 def get_tsclean_baseline():
-    RBaseline(forecast_tsclean_)
+    return RBaseline(forecast_tsclean_)
 
 
 #
