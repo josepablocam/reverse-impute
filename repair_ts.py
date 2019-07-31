@@ -27,11 +27,13 @@ class ModelWrapper(object):
         return self
 
     def predict_is_imputed(self, *args, **kwargs):
-        raise NotImplementedError("Implement in subclass")
+        probs = self.probability_is_imputed(*args, **kwargs)
+        threshold = kwargs.get("threshold", 0.0)
+        yhat = probs > threshold
+        return yhat.astype(bool)
 
     def probability_is_imputed(self, *args, **kwargs):
-        yhat = self.predict_is_imputed(*args, **kwargs)
-        return yhat.astype(float)
+        raise NotImplementedError("Implement in subclass")
 
     def __call__(self, *args, **kwargs):
         return self.probability_is_imputed(*args, **kwargs)
@@ -43,7 +45,10 @@ class GreedyMSEMinimizer(ModelWrapper):
         self.model = model.eval()
         self.step_size = step_size
 
-    def predict_is_imputed(self, X, step_size=None, extra_info=False):
+    def probability_is_imputed(
+            self, X, step_size=None, extra_info=False, **kwargs
+    ):
+        # produces probabilities of 1 and 0 only, since makes decisions
         if step_size is None:
             step_size = self.step_size
         probs = self.model.probability_is_imputed(X)
@@ -63,46 +68,59 @@ class GreedyMSEMinimizer(ModelWrapper):
         else:
             return yhat
 
+
 class RBaseline(ModelWrapper):
     def __init__(self, r_function):
         super().__init__()
         self.r_function = r_function
 
-    def predict_is_imputed(self, X):
+    def probability_is_imputed(self, X, **kwargs):
         nrows = X.shape[0]
         results = []
         for i in tqdm.tqdm(range(0, nrows)):
             v = pd.Series(X[i, :])
             vhat = numpy2ri.ri2py(self.r_function(v))
             results.append(np.isnan(vhat))
-        return np.array(results).astype(bool)
+        return np.array(results).astype(float)
+
+
+class ManualBaseline(ModelWrapper):
+    def __init__(self, threshold=0.2):
+        super().__init__()
+        self.threshold = threshold
+
+    def probability_is_imputed(self, X, **kwargs):
+        zero_or_ones = (X == 0) | (X == 1)
+        nrows = X.shape[0]
+        nsteps = X.shape[1]
+        preds = []
+        for i in tqdm.tqdm(range(0, nrows)):
+            row = X[i, :]
+            row_indicator = np.repeat(False, nsteps)
+            # repeated constants: possibly mean/mode
+            vals, counts = np.unique(row, return_counts=True)
+            if max(counts) > 1:
+                rep_val = vals[np.argmax(counts)]
+                row_indicator[row == rep_val] = True
+            # repeated values in sequence, possible fwd/bwd (can only identify)
+            # one otherwise end up labeling both
+            row_0_to_n_minus_1 = row[:(nsteps - 1)]
+            row_1_to_n = row[1:]
+            possible_fwd = np.append(False, row_0_to_n_minus_1 == row_1_to_n)
+            row_indicator |= possible_fwd
+            # large difference in values
+            abs_pct_diffs = np.abs(row_1_to_n - row_0_to_n_minus_1
+                                   ) / np.abs(row_0_to_n_minus_1)
+            possible_shift = np.append([False], abs_pct_diffs > self.threshold)
+            row_indicator |= possible_shift
+            preds.append(row_indicator)
+        preds = np.array(preds)
+        return preds.astype(float)
 
 
 def get_tsoutliers_baseline():
     return RBaseline(ts_outliers_)
 
+
 def get_tsclean_baseline():
     return RBaseline(forecast_tsclean_)
-
-
-#
-# class RepairImpute(object):
-#     def __init__(self, model):
-#         self.model = model.eval()
-#
-#     def remove_imputed(self, ts, threshold=0.5):
-#         is_imp = self.model.predict_is_imputed(ts, threshold)
-#         is_imp = is_imp.numpy().astype(bool)
-#         ts[is_imp] = np.nan
-#         return ts
-#
-#     def reimpute(self, ts, method, threshold=0.5):
-#         ts_with_missing = self.remove_imputed(ts, threshold)
-#         nrows = ts_with_missing.shape[0]
-#         filled = []
-#         for i in range(nrows):
-#             tsw = pd.Series(ts_with_missing[i, :])
-#             tsf = impute_missing_(tsw, method)
-#             filled.append(tsf)
-#         result = np.vstack(filled)
-#         return result
