@@ -64,7 +64,7 @@ impute_missing <- function(vec, method_name) {
     chosen_method(vec)
 }
 
-generate_dataset <- function(num_ts, num_obs=200, probs=c(0.2), methods=c("mean"), num_iters=10, seed=NULL) {
+generate_dataset <- function(input_, num_obs=200, prob_bounds=c(0.1, 0.5), methods=c("mean"), num_iters=10, seed=NULL) {
     if (!is.null(seed)) {
       set.seed(seed)
     }
@@ -72,36 +72,45 @@ generate_dataset <- function(num_ts, num_obs=200, probs=c(0.2), methods=c("mean"
     all_generated <- list()
     list_ix <- 1
 
-    total_iters <- num_ts * length(probs) * num_iters * length(methods)
+    if (is.numeric(input_)) {
+        generating_ts <- TRUE
+        num_ts <- input_
+    } else {
+        generating_ts <- FALSE
+        existing_ts <- input_
+        num_ts <- length(existing_ts)
+    }
+
+    total_iters <- num_ts * num_iters * length(methods)
     pb_bar <- progress_bar$new(total=total_iters)
 
 
     for (ts_id in seq(num_ts)) {
-        ts_config <- gen_ts_config()
-        ts_vec <- gen_ts(ts_config, num_obs)
+        if (generating_ts) {
+            ts_config <- gen_ts_config()
+            ts_vec <- gen_ts(ts_config, num_obs)
+        } else {
+            ts_vec <- existing_ts[[ts_id]]
+        }
+        for (iter_ in seq(num_iters)) {
+            prob <- runif(1, min=prob_bounds[1], max=prob_bounds[2])
+            modified <- add_missing(ts_vec, prob)
+            for (method in methods) {
 
-        for (prob in probs) {
+              copied <- modified
+              copied$filled <- impute_missing(copied$with_missing, method)
 
-          for (iter_ in seq(num_iters)) {
+              generated_df <- as.data.frame(copied)
+              generated_df$prob <- prob
+              generated_df$method <- method
+              generated_df$ts_id <- ts_id
+              generated_df$iter <- iter_
+              generated_df$unique_id <- list_ix
 
-              modified <- add_missing(ts_vec, prob)
-              for (method in methods) {
-
-                copied <- modified
-                copied$filled <- impute_missing(copied$with_missing, method)
-
-                generated_df <- as.data.frame(copied)
-                generated_df$prob <- prob
-                generated_df$method <- method
-                generated_df$ts_id <- ts_id
-                generated_df$iter <- iter_
-                generated_df$unique_id <- list_ix
-
-                all_generated[[list_ix]] <- generated_df
-                list_ix <- list_ix + 1
-                pb_bar$tick()
-              }
-          }
+              all_generated[[list_ix]] <- generated_df
+              list_ix <- list_ix + 1
+              pb_bar$tick()
+            }
         }
     }
     do.call(rbind, all_generated)

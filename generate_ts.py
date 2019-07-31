@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+import pickle
 
 import pandas as pd
 from rpy2 import robjects
@@ -16,21 +17,24 @@ generate_dataset_ = rinterpreter("generate_dataset")
 
 
 def generate_dataset(
-        num_ts,
-        num_obs,
-        probs=None,
+        _input,
+        num_obs=100,
+        prob_bounds=None,
         methods=None,
         num_iters=10,
         seed=42,
 ):
-    if probs is None:
-        probs = [0.2]
+    if isinstance(_input, str):
+        with open(_input, "rb") as fin:
+            _input = pickle.load(_input)
+    if prob_bounds is None:
+        prob_bounds = [0.2, 0.5]
     if methods is None:
         methods = AVAILABLE_IMPUTATION_METHODS
     df = generate_dataset_(
-        num_ts,
-        num_obs,
-        probs=probs,
+        _input,
+        num_obs=num_obs,
+        prob_bounds=prob_bounds,
         methods=methods,
         num_iters=num_iters,
         seed=seed,
@@ -55,12 +59,17 @@ def get_args():
         help="Number of different original (complete) timeseries",
     )
     parser.add_argument(
+        "--existing_ts",
+        type=str,
+        help="Path to dataframe with existing timeseries (pickled as list)",
+    )
+    parser.add_argument(
         "--num_obs",
         type=int,
         help="Number of observations per time series",
     )
     parser.add_argument(
-        "--probs",
+        "--prob_bounds",
         type=float,
         nargs="+",
         help=
@@ -88,10 +97,11 @@ def get_args():
 
 def main():
     args = get_args()
+    _input = args.num_ts or args.existing_ts
     df = generate_dataset(
-        args.num_ts,
-        args.num_obs,
-        probs=args.probs,
+        _input,
+        num_obs=args.num_obs,
+        prob_bounds=args.prob_bounds,
         methods=args.methods,
         num_iters=args.num_iters,
         seed=args.seed,
