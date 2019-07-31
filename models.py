@@ -156,9 +156,13 @@ class ReverseImputer(nn.Module):
         pred_y = self.forward(batch_x)
         return self.loss_fun(pred_y, batch_y)
 
+    def get_device(self):
+        return next(self.parameters()).device
+
     def probability_is_imputed(self, ts):
         self.eval()
         ts_tensor = torch.tensor(ts).to(torch.float32)
+        ts_tensor = ts_tensor.to(self.get_device())
         with torch.no_grad():
             scores = self.forward(ts_tensor)
         pred_is_imp = torch.sigmoid(scores)

@@ -6,13 +6,20 @@ import tqdm
 import pandas as pd
 
 
-def summary_classification_stats(y_obs, y_pred, y_probs):
-    return {
-        "precision": sklearn.metrics.precision_score(y_obs, y_pred),
-        "recall": sklearn.metrics.recall_score(y_obs, y_pred),
-        "f1": sklearn.metrics.f1_score(y_obs, y_pred),
-        "auc_score": sklearn.metrics.roc_auc_score(y_obs, y_probs),
+def summary_classification_stats(y_obs, y_pred, y_probs, stats=None):
+    if stats is None:
+        stats = ["precision", "recall", "f1", "auc"]
+    stat_funs = {
+        "precision": lambda x: sklearn.metrics.precision_score(x[0], x[1]),
+        "recall": lambda x: sklearn.metrics.precision_score(x[0], x[1]),
+        "f1": lambda x: sklearn.metrics.precision_score(x[0], x[1]),
+        "auc": lambda x: sklearn.metrics.precision_score(x[0], x[2]),
     }
+    results = {}
+    for stat_name in stats:
+        stat_fun = stat_funs[stat_name]
+        results[stat_name] = stat_fun([y_obs, y_pred, y_probs])
+    return results
 
 
 def scan_for_max_f1(
@@ -67,18 +74,25 @@ def upper_limit_performance(
     nrows = X.shape[0]
     results = []
 
-    for i in tqdm.tqdm(range(nrows)):
-        y_i = y[i, :]
-        y_probs_i = y_probs[i, :]
-        max_f1 = max([
-            sklearn.metrics.f1_score(y_i, y_probs_i > threshold)
-            for threshold in np.linspace(0, 1.0, 11)
-        ],
-        )
+    for i in tqdm.tqdm(range(0, nrows)):
         info = {}
         subset_df = df.loc[unique_ids[i]]
         info["impute_method"] = subset_df.method.values[0]
-        info["max_f1"] = max_f1
+        y_i = y[i, :]
+        y_probs_i = y_probs[i, :]
+        thresholds = np.linspace(0, 1.0, 11)
+        f1_scores = [
+            sklearn.metrics.f1_score(y_i, y_probs_i > threshold)
+            for threshold in thresholds
+        ]
+        max_ix = np.argmax(f1_scores)
+        info["threshold"] = thresholds[max_ix]
+        y_hat_i = y_probs_i > thresholds[max_ix]
+        info.update(
+            summary_classification_stats(
+                y_i, y_hat_i, y_probs_i, stats=["f1", "precision", "recall"]
+            )
+        )
         results.append(info)
     return pd.DataFrame(results)
 
@@ -113,7 +127,7 @@ def compute_ts_stats(model, dataset, threshold):
 
 def summarize_ts_stats(df):
     return df.groupby("impute_method")[[
-        "f1", "precision", "recall", "auc_score", "orig_mse"
+        "f1", "precision", "recall", "auc", "orig_mse"
     ]].mean()
 
 
