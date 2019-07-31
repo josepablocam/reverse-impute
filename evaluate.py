@@ -1,9 +1,14 @@
+from argparse import ArgumentParser
+
 import matplotlib.pyplot as plt
 import numpy as np
 import sklearn.metrics
 import torch
 import tqdm
 import pandas as pd
+
+import models
+from training import TSDataset
 
 
 def summary_classification_stats(y_obs, y_pred, y_probs, stats=None):
@@ -173,3 +178,55 @@ def visualize(model, threshold, df, method=None, unique_id=None, seed=None):
     axes[3].plot(y_probs, label="Probability")
     print(summary_classification_stats(df["mask"].values, y_hat, y_probs))
     return axes, df, seed
+
+
+def run_evaluation(ts_data, model, baselines):
+    results = []
+    valid_results = scan_for_max_f1(model, ts_data["valid"])
+    threshold = valid_results["best_threshold"]
+    model_results = summarize_ts_stats(
+        compute_ts_stats(model, ts_data["test"], threshold),
+    )
+    model_results["approach"] = "reverse-impute"
+    results.append(model_results)
+
+    for baseline_name, baseline_model in baselines.items():
+        baseline_model.fit(ts_data["valid"])
+        baseline_results = summarize_ts_stats(
+            compute_ts_stats(baseline_model, ts_data["test"], 0.0),
+        )
+        baseline_results["approach"] = baseline_name
+        results.append(baseline_results)
+    df = pd.DataFrame(results)
+
+def get_args():
+    parser = ArgumentParser(description="Run evaluation")
+    parser.add_argument("-i", "--input", type=str, help="Path to dataset splits")
+    parser.add_argument("-m", "--model", type=str, help="Path to trained model")
+    parser.add_argument("-b", "--baselines", type=str, nargs="+", help="Baselines to compare")
+    parser.add_argument("-o", "--output", type=str, help="Output df with results")
+    return parser.parse_args()
+
+
+def main():
+    args = get_args()
+    model = models.ReverseImputer(args.hidden_size, args.hidden_size)
+    model.load(args.model)
+    baselines = {
+        "tsoutliers": get_tsoutliers_baseline(),
+        "tsclean": get_tsclean_baseline(),
+        "manual": get_manual_baseline(),
+    }
+    if args.baselines is not None:
+        baselines = {k:m for k, m in baselines.items() if k in args.baselines}
+    with open(args.input, "rb") as fin:
+        ts_data = pickle.load(fin)
+    df = run_evaluation(ts_data, model, baselines)
+    df.to_csv(args.output)
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as err:
+        import pdb
+        pdb.post_mortem()

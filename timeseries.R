@@ -76,21 +76,26 @@ generate_dataset <- function(input_, num_obs=200, prob_bounds=c(0.1, 0.5), metho
         generating_ts <- TRUE
         num_ts <- input_
     } else {
+        stopifnot(is.data.frame(input_))
         generating_ts <- FALSE
-        existing_ts <- input_
-        num_ts <- length(existing_ts)
+        existing_ts_df <- input_
+        ts_ids <- unique(existing_ts_df$ts_id)
+        num_ts <- length(ts_ids)
     }
 
     total_iters <- num_ts * num_iters * length(methods)
     pb_bar <- progress_bar$new(total=total_iters)
 
 
-    for (ts_id in seq(num_ts)) {
+    for (ts_ix in seq(num_ts)) {
         if (generating_ts) {
             ts_config <- gen_ts_config()
             ts_vec <- gen_ts(ts_config, num_obs)
+            ts_id <- ts_ix
         } else {
-            ts_vec <- existing_ts[[ts_id]]
+            ts_id <- ts_ids[ts_ix]
+            ts_data <- existing_ts_df[existing_ts_df$ts_id == ts_id]
+            ts_vec <- ts_data$orig
         }
         for (iter_ in seq(num_iters)) {
             prob <- runif(1, min=prob_bounds[1], max=prob_bounds[2])

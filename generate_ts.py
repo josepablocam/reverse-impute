@@ -25,8 +25,7 @@ def generate_dataset(
         seed=42,
 ):
     if isinstance(_input, str):
-        with open(_input, "rb") as fin:
-            _input = pickle.load(_input)
+        _input = pd.read_csv(_input)
     if prob_bounds is None:
         prob_bounds = [0.2, 0.5]
     if methods is None:
@@ -61,7 +60,7 @@ def get_args():
     parser.add_argument(
         "--existing_ts",
         type=str,
-        help="Path to dataframe with existing timeseries (pickled as list)",
+        help="Path to dataframe with existing timeseries",
     )
     parser.add_argument(
         "--num_obs",

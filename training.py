@@ -1,3 +1,7 @@
+from argparse import ArgumentParser
+import os
+import pickle
+
 import pandas as pd
 import numpy as np
 from tensorboardX import SummaryWriter
@@ -135,7 +139,9 @@ class Trainer(object):
                     iter_ct,
                 )
                 if valid_every_n_batches is not None and iter_ct % valid_every_n_batches == 0:
-                    valid_loss = self.evaluate(model, datasets["valid"], device)
+                    valid_loss = self.evaluate(
+                        model, datasets["valid"], device
+                    )
                     monitor.add_scalar(
                         "data/valid_loss",
                         valid_loss,
@@ -148,3 +154,95 @@ class Trainer(object):
                     info.append(iter_info)
 
         return model, pd.DataFrame(info)
+
+
+def get_args():
+    parser = ArgumentParser(description="Train model")
+    parser.add_argument(
+        "-i",
+        "--input",
+        type=str,
+        help="CSV with training data",
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        type=str,
+        help="Output directory",
+    )
+    parser.add_argument(
+        "--valid",
+        type=float,
+        help="Fraction of data for validation",
+        default=0.2,
+    )
+    parser.add_argument(
+        "--test",
+        type=float,
+        help="Fraction of data for test",
+        default=0.1,
+    )
+    parser.add_argument(
+        "--hidden",
+        type=int,
+        help="Size of hidden layers",
+        default=50,
+    )
+    parser.add_argument(
+        "--num_iters",
+        type=int,
+        help="Number of iterations over dataset",
+        default=20,
+    )
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        help="Size of each mini-batch",
+        default=100,
+    )
+    parser.add_argument(
+        "--valid_every_n_batches",
+        type=int,
+        help="Validate model every n batches",
+        default=10,
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        help="RNG seed for data splitting",
+    )
+    return parser.parse_args()
+
+
+def main():
+    args = get_args()
+    df = pd.read_csv(args.input)
+    print("Preparing data split")
+    ts_data = get_data(
+        df,
+        frac_valid=args.valid,
+        frac_test=args.test,
+        seed=args.seed,
+    )
+    model = ReverseImputer(
+        enc_hidden_size=args.hidden_size,
+        pred_hidden_size=args.hidden_size,
+    )
+    trainer = Trainer()
+    if torch.cuda.is_available():
+        device = "cuda"
+    else:
+        device = "cpu"
+    model, info_df = trainer.train(
+        model,
+        ts_data,
+        num_iters=args.num_iters,
+        batch_size=args.batch_size,
+        valid_every_n_batches=args.valid_every_n_batches,
+        device=device,
+    )
+    if not os.path.exists(args.output):
+        os.makedirs(args.output)
+    model.save(os.path.join(args.output, "model.pth"))
+    with open(os.path.join(args.output, "dataset.pkl"), "wb") as fout:
+        pickle.dump(ts_data, fout)

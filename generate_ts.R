@@ -3,7 +3,7 @@ source("timeseries.R")
 library("argparse")
 
 parser <- ArgumentParser(description='Generate dataset')
-parser$add_argument("--existing_ts", type="character", help="Existing timeseries as list")
+parser$add_argument("--existing_ts", type="character", help="Existing timeseries as csv table")
 parser$add_argument("--num_ts", type="integer", help="Number of timeseries")
 parser$add_argument("--num_obs", type="integer", help="Number of obs")
 parser$add_argument("--num_iters", type="integer", default=10, help="Number of iterations")
@@ -17,7 +17,7 @@ args <- parser$parse_args()
 if (!is.null(args$num_ts)) {
     input_ <- args$num_ts
 } else {
-    input_ <- load(args$existing_ts)
+    input_ <- read.csv(args$existing_ts, header=TRUE, sep=",")
 }
 
 data <- generate_dataset(
