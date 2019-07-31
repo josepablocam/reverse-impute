@@ -14,6 +14,8 @@ def setup():
     ipython.run_line_magic("load_ext", "rpy2.ipython")
     R("install.packages('imputeTS')")
     R("install.packages('argparse')")
+    R("install.packages('forecast')")
+    R("install.packages('tsoutliers')")
     bash("pip install tensorboardX")
 
 

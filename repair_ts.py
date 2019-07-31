@@ -15,9 +15,29 @@ rinterpreter.source("timeseries.R")
 
 impute_missing_ = rinterpreter("impute_missing")
 minimize_mse_ = rinterpreter("minimize_mse")
+forecast_tsclean_ = rinterpreter("forecast_tsclean")
+ts_outliers_ = rinterpreter("tsoutliers_tsoutliers")
 
 
-class GreedyMSEMinimizer(nn.Module):
+class ModelWrapper(object):
+    def to(self, x):
+        return self
+
+    def eval(self, x):
+        return self
+
+    def predict_is_imputed(self, *args, **kwargs):
+        raise NotImplementedError("Implement in subclass")
+
+    def probability_is_imputed(self, *args, **kwargs):
+        yhat = self.predict_is_imputed(*args, **kwargs)
+        return yhat.astype(float)
+
+    def __call__(self, *args, **kwargs):
+        return self.probability_is_imputed(*args, **kwargs)
+
+
+class GreedyMSEMinimizer(ModelWrapper):
     def __init__(self, model, step_size=0.1):
         super().__init__()
         self.model = model.eval()
@@ -43,34 +63,46 @@ class GreedyMSEMinimizer(nn.Module):
         else:
             return yhat
 
-    def probability_is_imputed(self, X, step_size=None):
-        # prob == 1.0 if we predict it, just for easy evaluation
-        if step_size is None:
-            step_size = self.step_size
-        yhat = self.predict_is_imputed(X, step_size, extra_info=False)
-        return yhat.astype(float)
+class RBaseline(ModelWrapper):
+    def __init__(self, r_function):
+        super().__init__()
+        self.r_function = r_function
 
-    def forward(self, X, step_size=None):
-        return self.probability_is_imputed(X, step_size=step_size)
+    def predict_is_imputed(self, X):
+        nrows = X.shape[0]
+        results = []
+        for i in tqdm.tqdm(range(0, nrows)):
+            v = pd.Series(X[i, :])
+            vhat = numpy2ri.ri2py(self.r_function(v))
+            results.append(np.isnan(vhat))
+        return np.array(results).astype(bool)
 
 
-class RepairImpute(object):
-    def __init__(self, model):
-        self.model = model.eval()
+def get_tsoutliers_baseline():
+    RBaseline(ts_outliers_)
 
-    def remove_imputed(self, ts, threshold=0.5):
-        is_imp = self.model.predict_is_imputed(ts, threshold)
-        is_imp = is_imp.numpy().astype(bool)
-        ts[is_imp] = np.nan
-        return ts
+def get_tsclean_baseline():
+    RBaseline(forecast_tsclean_)
 
-    def reimpute(self, ts, method, threshold=0.5):
-        ts_with_missing = self.remove_imputed(ts, threshold)
-        nrows = ts_with_missing.shape[0]
-        filled = []
-        for i in range(nrows):
-            tsw = pd.Series(ts_with_missing[i, :])
-            tsf = impute_missing_(tsw, method)
-            filled.append(tsf)
-        result = np.vstack(filled)
-        return result
+
+#
+# class RepairImpute(object):
+#     def __init__(self, model):
+#         self.model = model.eval()
+#
+#     def remove_imputed(self, ts, threshold=0.5):
+#         is_imp = self.model.predict_is_imputed(ts, threshold)
+#         is_imp = is_imp.numpy().astype(bool)
+#         ts[is_imp] = np.nan
+#         return ts
+#
+#     def reimpute(self, ts, method, threshold=0.5):
+#         ts_with_missing = self.remove_imputed(ts, threshold)
+#         nrows = ts_with_missing.shape[0]
+#         filled = []
+#         for i in range(nrows):
+#             tsw = pd.Series(ts_with_missing[i, :])
+#             tsf = impute_missing_(tsw, method)
+#             filled.append(tsf)
+#         result = np.vstack(filled)
+#         return result

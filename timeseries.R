@@ -1,6 +1,9 @@
 require("imputeTS")
 require("progress")
 require("scales")
+require("forecast")
+require("tsoutliers")
+
 
 AVAILABLE_IMPUTATION_METHODS <- list(
   mean=function(x) na_mean(x, option="mean"),
@@ -156,4 +159,19 @@ minimize_mse <- function(vec, probs, step_size, methods=NULL) {
       num_iters <- num_iters + 1
   }
   list(mse=curr_min_mse, method=curr_min_mse_method, threshold=curr_min_thresh, predicted=curr_predicted, num_iters=num_iters, history_mse=history_mse, history_thresh=history_thresh)
+}
+
+forecast_tsclean <- function(x) {
+    cleaned <- tsclean(x, replace.missing=FALSE, lambda="auto")
+    changed <- which(cleaned != x)
+    copy_x <- x
+    copy_x[changed] <- NA
+    copy_x
+}
+
+tsoutliers_tsoutliers <- function(x) {
+    results <- tsoutliers(x)
+    copy_x <- x
+    copy_x[results$index] <- NA
+    copy_x
 }
