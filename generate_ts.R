@@ -1,6 +1,7 @@
 # Script version in R of generate_ts.py
 source("timeseries.R")
 library("argparse")
+library("data.table")
 
 parser <- ArgumentParser(description='Generate dataset')
 parser$add_argument("--existing_ts", type="character", help="Existing timeseries as csv table")
@@ -28,4 +29,6 @@ data <- generate_dataset(
     num_iters=args$num_iters,
     seed=args$seed
 )
-write.csv(data, args$output, row.names=FALSE)
+# much faster version of write.csv from data.table package
+print("Saving out file")
+fwrite(data, file=args$output, row.names=FALSE)

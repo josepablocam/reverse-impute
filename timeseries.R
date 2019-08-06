@@ -3,6 +3,7 @@ require("progress")
 require("scales")
 require("forecast")
 require("tsoutliers")
+require("data.table")
 
 
 AVAILABLE_IMPUTATION_METHODS <- list(
@@ -126,7 +127,9 @@ generate_dataset <- function(input_, num_obs=200, prob_bounds=c(0.1, 0.5), metho
             }
         }
     }
-    do.call(rbind, all_generated)
+    # much faster than do.call(rbind)
+    generated_df <- rbindlist(all_generated)
+    as.data.frame(generated_df)
 }
 
 
