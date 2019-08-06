@@ -224,6 +224,11 @@ def get_args():
         type=int,
         help="RNG seed for data splitting",
     )
+    parser.add_argument(
+        "--log",
+        type=str,
+        help="Directory for tensorboard logs",
+    )
     return parser.parse_args()
 
 
@@ -253,6 +258,7 @@ def main():
         batch_size=args.batch_size,
         valid_every_n_batches=args.valid_every_n_batches,
         device=device,
+        tensorboard_log=args.log,
     )
     if not os.path.exists(args.output):
         os.makedirs(args.output)
