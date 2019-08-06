@@ -83,22 +83,25 @@ def get_stock_prices(
 def get_args():
     parser = argparse.ArgumentParser(description="Save down SP500 prices")
     parser.add_argument("-o", "--output", type=str, help="Output path for csv")
+    parser.add_argument("-k", "--key", type=str, help="Quandl key")
     return parser.parse_args()
 
 
 def main():
     args = get_args()
+    if args.key is not None:
+        activate_quandl(args.key)
     sp500_tickers = get_sp500_tickers()
     tickers = sp500_tickers.ticker.values.tolist()
-    data = download_stock_prices.get_stock_prices(
+    df, failed = get_stock_prices(
         tickers,
         n=10,
-        start_date='2015-12-31',
-        end_date='2016-12-31',
+        start_date='2014-12-31',
+        end_date='2018-12-31',
     )
-    print("Failed to collect data for {}".format(data[1]))
-    df = data[0]
-    df.to_csv(args.output)
+    if len(failed)> 0:
+        print("Failed to collect data for {}".format(failed)
+    df.to_csv(args.output, index=False)
 
 
 if __name__ == "__main__":

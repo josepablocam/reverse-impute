@@ -231,7 +231,6 @@ class GreedyMSEMinimizer(ModelWrapper):
             v = pd.Series(X[i, :])
             p = pd.Series(probs[i, :])
             result = minimize_mse_(v, p, step_size)
-            result = {k: numpy2ri.ri2py(v) for k, v in result.items()}
             result = {k: v[0] if len(v) == 1 else v for k, v in result.items()}
             acc.append(result)
         df = pd.DataFrame(acc)
@@ -255,7 +254,7 @@ class RBaseline(ModelWrapper):
         results = []
         for i in tqdm.tqdm(range(0, nrows)):
             v = pd.Series(X[i, :])
-            vhat = numpy2ri.ri2py(self.r_function(v))
+            vhat = self.r_function(v)
             results.append(np.isnan(vhat))
         return np.array(results).astype(float)
 

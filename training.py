@@ -10,6 +10,8 @@ import torch.optim as optim
 import torch.utils.data as data
 import tqdm
 
+import models
+
 
 def get_matrix_vals(df, key_col, val_col):
     lists = df.groupby(key_col)[val_col].apply(list).values
@@ -31,10 +33,8 @@ class TSDataset(data.Dataset):
     def __getitem__(self, ix):
         chosen_X = self.X[ix]
         chosen_y = self.y[ix]
-        return (
-            torch.tensor(chosen_X).to(torch.float32),
-            torch.tensor(chosen_y).to(torch.float32)
-        )
+        return (torch.tensor(chosen_X).to(torch.float32),
+                torch.tensor(chosen_y).to(torch.float32))
 
     def sample(self, n, seed=None):
         if seed is not None:
@@ -45,6 +45,22 @@ class TSDataset(data.Dataset):
         sampled_df = self.df[self.df.unique_id.isin(unique_ids)]
         sampled_df = sampled_df.reset_index(drop=True)
         return TSDataset(sampled_df)
+
+
+def prune_to_same_length(df, length):
+    # make into matrix, takes first num_obs if more
+    # removes from dataset if less than num_obs available
+    df = df.sort_values(["unique_id", "time"])
+    unique_ids = df.unique_id.unique()
+    results = []
+    for uid in tqdm.tqdm(unique_ids):
+        df_subset = df[df.unique_id == uid]
+        if df_subset.shape[0] > length:
+            df_subset = df_subset.head(length)
+        if df_subset.shape[0] == length:
+            results.append(df_subset)
+    pruned_df = pd.concat(results, axis=0)
+    return pruned_df.reset_index(drop=True)
 
 
 def get_data(df, frac_valid, frac_test, seed=None):
@@ -90,16 +106,14 @@ class Trainer(object):
         model.train()
         return loss
 
-    def train(
-            self,
-            model,
-            datasets,
-            num_iters,
-            batch_size=100,
-            valid_every_n_batches=None,
-            device="cpu",
-            tensorboard_log=None
-    ):
+    def train(self,
+              model,
+              datasets,
+              num_iters,
+              batch_size=100,
+              valid_every_n_batches=None,
+              device="cpu",
+              tensorboard_log=None):
         model = model.to(torch.device(device))
 
         optimizer = optim.Adam(model.parameters())
@@ -139,9 +153,8 @@ class Trainer(object):
                     iter_ct,
                 )
                 if valid_every_n_batches is not None and iter_ct % valid_every_n_batches == 0:
-                    valid_loss = self.evaluate(
-                        model, datasets["valid"], device
-                    )
+                    valid_loss = self.evaluate(model, datasets["valid"],
+                                               device)
                     monitor.add_scalar(
                         "data/valid_loss",
                         valid_loss,
@@ -183,7 +196,7 @@ def get_args():
         default=0.1,
     )
     parser.add_argument(
-        "--hidden",
+        "--hidden_size",
         type=int,
         help="Size of hidden layers",
         default=50,
@@ -224,7 +237,7 @@ def main():
         frac_test=args.test,
         seed=args.seed,
     )
-    model = ReverseImputer(
+    model = models.ReverseImputer(
         enc_hidden_size=args.hidden_size,
         pred_hidden_size=args.hidden_size,
     )
@@ -246,3 +259,11 @@ def main():
     model.save(os.path.join(args.output, "model.pth"))
     with open(os.path.join(args.output, "dataset.pkl"), "wb") as fout:
         pickle.dump(ts_data, fout)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as err:
+        import pdb
+        pdb.post_mortem()

@@ -28,4 +28,4 @@ data <- generate_dataset(
     num_iters=args$num_iters,
     seed=args$seed
 )
-write.csv(data, args$output)
+write.csv(data, args$output, row.names=FALSE)

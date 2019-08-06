@@ -8,56 +8,95 @@ METHODS="mean median \
   spline_interpolation stine_interpolation \
   kalman_arima"
 
+DATA_DIR="/Data/reverse-impute"
+if [ ! -d ${DATA_DIR} ]
+then
+  echo "Creating ${DATA_DIR}"
+  mkdir -p ${DATA_DIR}
+fi
+
+# length of time series
+TS_LENGTH=100
+
 # Generate synthetic data
 Rscript generate_ts.R \
   --num_ts 1000 \
-  --num_obs 100 \
+  --num_obs ${TS_LENGTH} \
   --num_iters 10 \
   --prob_bounds 0.2 0.5 \
   --methods ${METHODS} \
   --seed 42 \
-  --output generated.csv
+  --output "${DATA_DIR}/generated.csv"
 
 # Download real world stock price data
-python download_stock_prices.py --output sp500_prices.csv
+python download_stock_prices.py --output "${DATA_DIR}/sp500_prices.csv"
 
 # Add synthetic missing values
 Rscript generate_ts.R \
-  --existing_ts sp500_prices.csv \
+  --existing_ts "${DATA_DIR}/sp500_prices.csv" \
   --num_iters 10 \
   --prob_bounds 0.2 0.5 \
   --methods ${METHODS} \
   --seed 42 \
-  --output sp500_prices_with_missing.csv
+  --output "${DATA_DIR}/sp500_prices_with_missing.csv"
+
 
 # Train model on synthetic data
-python train.py \
-  --input generated.csv \
-  --output train-results/ \
+mkdir "${DATA_DIR}/train/"
+python training.py \
+  --input "${DATA_DIR}/generated.csv" \
+  --output "${DATA_DIR}/train/" \
   --valid 0.2 \
   --test 0.1 \
-  --hidden 50 \
+  --hidden_size 50 \
   --num_iters 20 \
   --batch_size 100 \
   --valid_every_n_batches 10 \
   --seed 42
 
 # Compute synthetic data results with different methods
+mkdir "${DATA_DIR}/eval-synthetic/"
 python evaluate.py \
-    --input train-results/dataset.pkl \
-    --model train-results/model.pth \
+    --dataset "${DATA_DIR}/train/dataset.pkl" \
+    --model "${DATA_DIR}/train/model.pth" \
     --baselines tsoutliers tsclean manual \
-    --output eval-synthetic-results/generated-results.csv
+    --hidden_size 50 \
+    --output "${DATA_DIR}/eval-synthetic/no-noise-results.csv"
+
+python evaluate.py \
+    --dataset "${DATA_DIR}/train/dataset.pkl" \
+    --model "${DATA_DIR}/train/model.pth" \
+    --baselines tsoutliers tsclean manual \
+    --with_noise \
+    --seed 42 \
+    --output "${DATA_DIR}/eval-synthetic/with-noise-results.csv"
 
 # Compute results on sp500 prices
+mkdir "${DATA_DIR}/eval-sp500/"
 python evaluate.py \
-    --csv sp500_prices_with_missing.csv \
+    --csv "${DATA_DIR}/sp500_prices_with_missing.csv" \
+    --dataset "${DATA_DIR}/eval-sp500/dataset.pkl" \
     --valid 0.5 \
     --test 0.5 \
-    --model exp1/model.pth \
+    --model "${DATA_DIR}/train/model.pth" \
     --baselines tsoutliers tsclean manual \
-    --output eval-sp500-results/sp500-results.csv
+    --ts_length ${TS_LENGTH} \
+    --output "${DATA_DIR}/eval-sp500/no-noise-results.csv"
 
+
+python evaluate.py \
+    --dataset "${DATA_DIR}/eval-sp500/dataset.pkl" \
+    --valid 0.5 \
+    --test 0.5 \
+    --model "${DATA_DIR}/train/model.pth" \
+    --baselines tsoutliers tsclean manual \
+    --with_noise \
+    --seed 42 \
+    --output "${DATA_DIR}/eval-sp500/with-noise-results.csv"
+
+
+
+# TODO: this later part hasn't really been worked on
 # Compute MSE impact for future forecasts
 python repair_ts.py \
   --dataset eval-sp500-results/eval-dataset.pkl \

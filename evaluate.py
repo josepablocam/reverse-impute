@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+import os
 import pickle
 
 import matplotlib.pyplot as plt
@@ -9,7 +10,11 @@ import tqdm
 import pandas as pd
 
 import models
-from training import TSDataset, get_data
+from training import (
+    TSDataset,
+    get_data,
+    prune_to_same_length,
+)
 
 
 def summary_classification_stats(y_obs, y_pred, y_probs, stats=None):
@@ -96,9 +101,7 @@ def upper_limit_performance(
         y_hat_i = y_probs_i > thresholds[max_ix]
         info.update(
             summary_classification_stats(
-                y_i, y_hat_i, y_probs_i, stats=["f1", "precision", "recall"]
-            )
-        )
+                y_i, y_hat_i, y_probs_i, stats=["f1", "precision", "recall"]))
         results.append(info)
     return pd.DataFrame(results)
 
@@ -186,52 +189,82 @@ def run_evaluation(ts_data, model, baselines):
     valid_results = scan_for_max_f1(model, ts_data["valid"])
     threshold = valid_results["best_threshold"]
     model_results = summarize_ts_stats(
-        compute_ts_stats(model, ts_data["test"], threshold),
-    )
+        compute_ts_stats(model, ts_data["test"], threshold), )
     model_results["approach"] = "reverse-impute"
     results.append(model_results)
 
     for baseline_name, baseline_model in baselines.items():
-        baseline_model.fit(ts_data["valid"])
+        baseline_model.fit(ts_data["valid"].X, ts_data["valid"].y)
         baseline_results = summarize_ts_stats(
-            compute_ts_stats(baseline_model, ts_data["test"], 0.0),
-        )
+            compute_ts_stats(baseline_model, ts_data["test"], 0.0), )
         baseline_results["approach"] = baseline_name
         results.append(baseline_results)
-    df = pd.DataFrame(results)
+
+    results = [r.reset_index() for r in results]
+    df = pd.concat(results, axis=0)
+    return df
+
+
+def add_white_gaussian_noise(ts_data, seed=None):
+    if seed is not None:
+        np.random.seed(seed)
+    noisy_ts_data = {}
+    for name, ts in ts_data.items():
+        noisy_df = ts.df.copy()
+        nrows = ts.df.shape[0]
+        noise = np.random.normal(0.0, 1.0, size=nrows)
+        noisy_df["filled"] = noisy_df["filled"] + noise
+        noisy_ts_data[name] = TSDataset(noisy_df)
+    return noisy_ts_data
+
+
+def add_noise(ts_data, method="white-gaussian", seed=None):
+    print("Adding noise with method={}".format(method))
+    if method == "white-gaussian":
+        return add_white_gaussian_noise(ts_data, seed=seed)
+    else:
+        raise ValueError("Unknown noise method: {}".format(method))
 
 
 def get_args():
     parser = ArgumentParser(description="Run evaluation")
     parser.add_argument(
-        "-d", "--dataset", type=str, help="Path to dataset splits"
-    )
+        "-d", "--dataset", type=str, help="Path to dataset splits")
     parser.add_argument("-c", "--csv", type=str, help="Path to csv of dataset")
     parser.add_argument(
         "-v",
         "--valid",
         type=float,
         help="Fraction of csv for validation",
-        default=0.5
-    )
+        default=0.5)
     parser.add_argument(
         "-t",
         "--test",
         type=float,
         help="Fraction of csv for test",
-        default=0.5
+        default=0.5)
+    parser.add_argument(
+        "--hidden_size",
+        type=int,
+        help="Hidden size for model loading",
     )
     parser.add_argument(
-        "-s", "--seed", type=int, help="RNG seed to split dataset", default=42
+        "-s", "--seed", type=int, help="RNG seed to split dataset", default=42)
+    parser.add_argument(
+        "-m", "--model", type=str, help="Path to trained model")
+    parser.add_argument(
+        "-b", "--baselines", type=str, nargs="+", help="Baselines to compare")
+    parser.add_argument(
+        "-o", "--output", type=str, help="Output df with results")
+    parser.add_argument(
+        "--with_noise",
+        action="store_true",
+        help="Add white gaussian noise to filled-in dataset",
     )
     parser.add_argument(
-        "-m", "--model", type=str, help="Path to trained model"
-    )
-    parser.add_argument(
-        "-b", "--baselines", type=str, nargs="+", help="Baselines to compare"
-    )
-    parser.add_argument(
-        "-o", "--output", type=str, help="Output df with results"
+        "--ts_length",
+        type=int,
+        help="Max (and min) length of timeseries",
     )
     return parser.parse_args()
 
@@ -241,22 +274,28 @@ def main():
     model = models.ReverseImputer(args.hidden_size, args.hidden_size)
     model.load(args.model)
     baselines = {
-        "tsoutliers": get_tsoutliers_baseline(),
-        "tsclean": get_tsclean_baseline(),
-        "manual": get_manual_baseline(),
+        "tsoutliers": models.get_tsoutliers_baseline(),
+        "tsclean": models.get_tsclean_baseline(),
+        "manual": models.get_manual_baseline(),
     }
     if args.baselines is not None:
         baselines = {k: m for k, m in baselines.items() if k in args.baselines}
-    if args.dataset is not None:
-        with open(args.input, "rb") as fin:
-            ts_data = pickle.load(fin)
-    elif args.csv is not None:
+    if args.csv is not None:
         df = pd.read_csv(args.csv)
+        if args.ts_length is not None:
+            df = prune_to_same_length(df, args.ts_length)
         ts_data = get_data(df, args.valid, args.test, seed=args.seed)
-        with open(os.path.join(args.output, "eval-dataset.pkl"), "wb") as fout:
-            pickle.dump(ts_data, fout)
+        if args.dataset is not None:
+            with open(args.dataset, "wb") as fout:
+                pickle.dump(ts_data, fout)
+    else:
+        with open(args.dataset, "rb") as fin:
+            ts_data = pickle.load(fin)
+    if args.with_noise:
+        ts_data = add_noise(ts_data, method="white-gaussian", seed=args.seed)
+
     results_df = run_evaluation(ts_data, model, baselines)
-    results_df.to_csv(os.path.join(args.output, "eval-results.csv"))
+    results_df.to_csv(args.output, index=False)
 
 
 if __name__ == "__main__":

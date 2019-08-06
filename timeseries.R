@@ -94,7 +94,7 @@ generate_dataset <- function(input_, num_obs=200, prob_bounds=c(0.1, 0.5), metho
             ts_id <- ts_ix
         } else {
             ts_id <- ts_ids[ts_ix]
-            ts_data <- existing_ts_df[existing_ts_df$ts_id == ts_id]
+            ts_data <- existing_ts_df[existing_ts_df$ts_id == ts_id, ]
             ts_vec <- ts_data$orig
         }
         for (iter_ in seq(num_iters)) {
