@@ -103,8 +103,16 @@ generate_dataset <- function(input_, num_obs=200, prob_bounds=c(0.1, 0.5), metho
             for (method in methods) {
 
               copied <- modified
-              copied$filled <- impute_missing(copied$with_missing, method)
-
+              copied$filled <- tryCatch(
+                {impute_missing(copied$with_missing, method)},
+                error = function(e) NULL
+              )
+              if (is.null(copied$filled)) {
+                  print(paste("Skipping", "ts_id=", ts_id, ",iter_=", iter_, ",method=", method))
+                  print("Fails to impute due to too few non-missing values")
+                  pb_bar$tick()
+                  next
+              }
               generated_df <- as.data.frame(copied)
               generated_df$prob <- prob
               generated_df$method <- method
