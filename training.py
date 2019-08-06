@@ -48,6 +48,7 @@ class TSDataset(data.Dataset):
 
 
 def prune_to_same_length(df, length):
+    print("Pruning to same length")
     # make into matrix, takes first num_obs if more
     # removes from dataset if less than num_obs available
     df = df.sort_values(["unique_id", "time"])
@@ -106,20 +107,23 @@ class Trainer(object):
         model.train()
         return loss
 
-    def train(self,
-              model,
-              datasets,
-              num_iters,
-              batch_size=100,
-              valid_every_n_batches=None,
-              device="cpu",
-              tensorboard_log=None):
+    def train(
+            self,
+            model,
+            datasets,
+            num_iters,
+            batch_size=100,
+            valid_every_n_batches=None,
+            device="cpu",
+            tensorboard_log=None,
+    ):
         model = model.to(torch.device(device))
 
         optimizer = optim.Adam(model.parameters())
 
         if tensorboard_log is None:
             tensorboard_log = "runs/exp-1"
+        print(tensorboard_log)
         monitor = SummaryWriter(tensorboard_log)
         iter_ct = 0
 
@@ -131,6 +135,7 @@ class Trainer(object):
             train_dataset,
             shuffle=True,
             batch_size=batch_size,
+            drop_last=True,
         )
 
         for _ in tqdm.tqdm(range(num_iters)):
@@ -202,6 +207,12 @@ def get_args():
         default=50,
     )
     parser.add_argument(
+        "--num_layers",
+        type=int,
+        help="Number of RNN hidden layers",
+        default=1,
+    )
+    parser.add_argument(
         "--num_iters",
         type=int,
         help="Number of iterations over dataset",
@@ -245,6 +256,7 @@ def main():
     model = models.ReverseImputer(
         enc_hidden_size=args.hidden_size,
         pred_hidden_size=args.hidden_size,
+        num_layers=args.num_layers,
     )
     trainer = Trainer()
     if torch.cuda.is_available():

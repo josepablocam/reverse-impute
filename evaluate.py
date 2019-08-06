@@ -135,9 +135,11 @@ def compute_ts_stats(model, dataset, threshold):
 
 
 def summarize_ts_stats(df):
-    return df.groupby("impute_method")[[
+    stats = df.groupby("impute_method")[[
         "f1", "precision", "recall", "auc", "orig_mse"
-    ]].mean()
+    ]].mean().reset_index()
+    cts = df.groupby("impute_method").size().to_frame(name="ct").reset_index()
+    return pd.merge(stats, cts, how="left", on="impute_method")
 
 
 def visualize(model, threshold, df, method=None, unique_id=None, seed=None):
@@ -200,9 +202,26 @@ def run_evaluation(ts_data, model, baselines):
         baseline_results["approach"] = baseline_name
         results.append(baseline_results)
 
-    results = [r.reset_index() for r in results]
+    results = [r.reset_index(drop=True) for r in results]
     df = pd.concat(results, axis=0)
     return df
+
+
+def sample_ts_data(ts_data, sample_n, seed=None):
+    print("Sampling ts_data")
+    if seed is not None:
+        np.random.seed(seed)
+    sampled_ts_data = {}
+    for name, data in ts_data.items():
+        ixs = np.arange(0, len(data))
+        chosen_ixs = np.random.choice(ixs, sample_n)
+        X = data.X[chosen_ixs, :]
+        y = data.y[chosen_ixs, :]
+        data.X = X
+        data.y = y
+        data.num_obs = sample_n
+        sampled_ts_data[name] = data
+    return sampled_ts_data
 
 
 def add_white_gaussian_noise(ts_data, seed=None):
@@ -249,6 +268,12 @@ def get_args():
         help="Hidden size for model loading",
     )
     parser.add_argument(
+        "--num_layers",
+        type=int,
+        help="Number of RNN hidden layers for model loading",
+        default=1,
+    )
+    parser.add_argument(
         "-s", "--seed", type=int, help="RNG seed to split dataset", default=42)
     parser.add_argument(
         "-m", "--model", type=str, help="Path to trained model")
@@ -266,13 +291,23 @@ def get_args():
         type=int,
         help="Max (and min) length of timeseries",
     )
+    parser.add_argument(
+        "--sample",
+        type=int,
+        help="Sample n timeseries for evaluation across each split of data",
+    )
     return parser.parse_args()
 
 
 def main():
     args = get_args()
-    model = models.ReverseImputer(args.hidden_size, args.hidden_size)
+    model = models.ReverseImputer(
+        args.hidden_size,
+        args.hidden_size,
+        num_layers=args.num_layers,
+    )
     model.load(args.model)
+
     baselines = {
         "tsoutliers": models.get_tsoutliers_baseline(),
         "tsclean": models.get_tsclean_baseline(),
@@ -280,8 +315,14 @@ def main():
     }
     if args.baselines is not None:
         baselines = {k: m for k, m in baselines.items() if k in args.baselines}
+
     if args.csv is not None:
         df = pd.read_csv(args.csv)
+        if args.sample is not None:
+            print("Sampling here")
+            np.random.seed(args.seed)
+            unique_ids = np.random.choice(df.unique_id.unique(), args.sample)
+            df = df[df.unique_id.isin(unique_ids)].reset_index(drop=True)
         if args.ts_length is not None:
             df = prune_to_same_length(df, args.ts_length)
         ts_data = get_data(df, args.valid, args.test, seed=args.seed)
@@ -291,8 +332,14 @@ def main():
     else:
         with open(args.dataset, "rb") as fin:
             ts_data = pickle.load(fin)
+
+        if args.sample is not None:
+            ts_data = sample_ts_data(ts_data, args.sample, seed=args.seed)
+
     if args.with_noise:
         ts_data = add_noise(ts_data, method="white-gaussian", seed=args.seed)
+
+
 
     results_df = run_evaluation(ts_data, model, baselines)
     results_df.to_csv(args.output, index=False)

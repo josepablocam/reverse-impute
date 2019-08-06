@@ -1,6 +1,7 @@
 library("imputeTS")
 library("forecast")
 source("timeseries.R")
+library("data.table")
 
 compare_mse_impact <- function(orig_data, new_data, n_first) {
       results <- list()
@@ -35,5 +36,5 @@ compare_mse_impact <- function(orig_data, new_data, n_first) {
           results[[iter_ct]] <- as.data.frame(iter_result)
       }
 
-      do.call(rbind, results)
+      results_df <- as.data.frame(rbindlist(results))
 }

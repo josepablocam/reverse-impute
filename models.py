@@ -99,14 +99,18 @@ class AttentionBasedSummarizer(nn.Module):
 
 
 class SequenceEncoder(nn.Module):
-    def __init__(self, hidden_size, encoder_type="bilstm", attention=True):
+    def __init__(self,
+                 hidden_size,
+                 encoder_type="bilstm",
+                 num_layers=1,
+                 attention=True):
         super().__init__()
 
         if encoder_type == "bilstm":
             self.encoder = nn.LSTM(
                 input_size=1,
                 hidden_size=hidden_size,
-                num_layers=1,
+                num_layers=num_layers,
                 batch_first=True,
                 bidirectional=True,
             )
@@ -127,9 +131,8 @@ class SequenceEncoder(nn.Module):
         n_time = batch.shape[1]
         diffed_ts = batch[:, n_lag:] - batch[:, :(n_time - n_lag)]
         # first n differences are zero by definition
-        zeros = torch.zeros((n_ts, n_lag, 1)).to(torch.float32).to(
-            batch.device
-        )
+        zeros = torch.zeros((n_ts, n_lag,
+                             1)).to(torch.float32).to(batch.device)
         return torch.cat((zeros, diffed_ts), dim=1)
 
     def forward(self, batch):
@@ -138,7 +141,6 @@ class SequenceEncoder(nn.Module):
         if len(batch.shape) == 2:
             batch = batch.unsqueeze(2)
         batch = self.zscore(batch)
-        batch = self.lagged_diff(batch, n_lag=1)
         H, (hn, cn) = self.encoder(batch)
         # append to each num steps the observed value as well
         # technically already captured by hidden state, but still
@@ -149,11 +151,16 @@ class SequenceEncoder(nn.Module):
 
 
 class ReverseImputer(nn.Module):
-    def __init__(self, enc_hidden_size, pred_hidden_size, attention=False):
+    def __init__(self,
+                 enc_hidden_size,
+                 pred_hidden_size,
+                 num_layers=1,
+                 attention=False):
         super().__init__()
         self.encoder = SequenceEncoder(
             enc_hidden_size,
             encoder_type="bilstm",
+            num_layers=num_layers,
             attention=attention,
         )
         self.predictor = MissingPredictor(
@@ -218,9 +225,11 @@ class GreedyMSEMinimizer(ModelWrapper):
         self.model = model.eval()
         self.step_size = step_size
 
-    def probability_is_imputed(
-            self, X, step_size=None, extra_info=False, **kwargs
-    ):
+    def probability_is_imputed(self,
+                               X,
+                               step_size=None,
+                               extra_info=False,
+                               **kwargs):
         # produces probabilities of 1 and 0 only, since makes decisions
         if step_size is None:
             step_size = self.step_size
@@ -301,8 +310,8 @@ class ManualBaseline(ModelWrapper):
             possible_fwd = np.append(False, row_0_to_n_minus_1 == row_1_to_n)
             row_indicator |= possible_fwd
             # large difference in values
-            abs_pct_diffs = np.abs(row_1_to_n - row_0_to_n_minus_1
-                                   ) / np.abs(row_0_to_n_minus_1)
+            abs_pct_diffs = np.abs(row_1_to_n - row_0_to_n_minus_1) / np.abs(
+                row_0_to_n_minus_1)
             possible_shift = np.append([False], abs_pct_diffs > threshold)
             row_indicator |= possible_shift
             preds.append(row_indicator)
