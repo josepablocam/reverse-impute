@@ -100,7 +100,7 @@ def main():
         end_date='2018-12-31',
     )
     if len(failed)> 0:
-        print("Failed to collect data for {}".format(failed)
+        print("Failed to collect data for {}".format(failed))
     df.to_csv(args.output, index=False)
 
 
