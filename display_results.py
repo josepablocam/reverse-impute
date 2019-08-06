@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 import pandas as pd
 
 def pivot(df, stats):
-    pvt = pd.pivot_table(df, keys=impute_method, values=stats, columns=approach)
+    pvt = pd.pivot_table(df, index="impute_method", values=stats, columns="approach")
     return pvt
 
 def get_args():

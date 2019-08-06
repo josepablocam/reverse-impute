@@ -20,13 +20,13 @@ TS_LENGTH=100
 EVAL_SAMPLE=5000
 
 # Generate synthetic data
-if [ $1 == "--generate" ]
+if [[ $# -eq 1 && $1 == "--generate" ]]
 then
     Rscript generate_ts.R \
       --num_ts 1000 \
       --num_obs ${TS_LENGTH} \
       --num_iters 10 \
-      --prob_bounds 0.2 0.5 \
+      --prob_bounds 0.0 0.3 \
       --methods ${METHODS} \
       --seed 42 \
       --output "${DATA_DIR}/generated.csv"
@@ -38,7 +38,7 @@ then
     Rscript generate_ts.R \
       --existing_ts "${DATA_DIR}/sp500_prices.csv" \
       --num_iters 10 \
-      --prob_bounds 0.2 0.5 \
+      --prob_bounds 0.0 0.3 \
       --methods ${METHODS} \
       --seed 42 \
       --output "${DATA_DIR}/sp500_prices_with_missing.csv"
@@ -60,7 +60,7 @@ python training.py \
   --valid 0.2 \
   --test 0.1 \
   --hidden_size 50 \
-  --num_layers 1 \
+  --num_layers 3 \
   --num_iters 20 \
   --batch_size 100 \
   --valid_every_n_batches 10 \
@@ -75,7 +75,7 @@ python evaluate.py \
     --model "${DATA_DIR}/train/model.pth" \
     --baselines tsoutliers tsclean manual \
     --hidden_size 50 \
-    --num_layers 1 \
+    --num_layers 3 \
     --sample ${EVAL_SAMPLE} \
     --seed 42 \
     --output "${DATA_DIR}/eval-synthetic/no-noise-results.csv"
@@ -85,7 +85,7 @@ python evaluate.py \
     --model "${DATA_DIR}/train/model.pth" \
     --baselines tsoutliers tsclean manual \
     --hidden_size 50 \
-    --num_layers 1 \
+    --num_layers 3 \
     --with_noise \
     --sample ${EVAL_SAMPLE} \
     --seed 42 \
@@ -113,8 +113,9 @@ python evaluate.py \
     --test 0.5 \
     --model "${DATA_DIR}/train/model.pth" \
     --hidden_size 50 \
-    --num_layers 1 \
+    --num_layers 3 \
     --baselines tsoutliers tsclean manual \
+    --ts_length ${TS_LENGTH} \
     --with_noise \
     --seed 42 \
     --sample ${EVAL_SAMPLE} \
