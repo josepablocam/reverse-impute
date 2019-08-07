@@ -32,7 +32,7 @@ then
       --output "${DATA_DIR}/generated.csv"
 
     # Download real world stock price data
-    python download_stock_prices.py --output "${DATA_DIR}/sp500_prices.csv"
+    python download_stock_prices.py --output "${DATA_DIR}/sp500_prices.csv" --key "x-TJ2nRnm7qvede5xHx6"
 
     # Add synthetic missing values
     Rscript generate_ts.R \
@@ -99,7 +99,7 @@ python evaluate.py \
     --test 0.5 \
     --model "${DATA_DIR}/train/model.pth" \
     --hidden_size 50 \
-    --num_layers 1 \
+    --num_layers 3 \
     --baselines tsoutliers tsclean manual \
     --ts_length ${TS_LENGTH} \
     --sample ${EVAL_SAMPLE} \

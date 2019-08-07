@@ -29,7 +29,10 @@ def summary_classification_stats(y_obs, y_pred, y_probs, stats=None):
     results = {}
     for stat_name in stats:
         stat_fun = stat_funs[stat_name]
-        results[stat_name] = stat_fun([y_obs, y_pred, y_probs])
+        try:
+            results[stat_name] = stat_fun([y_obs, y_pred, y_probs])
+        except ValueError:
+            results[stat_name] = np.nan
     return results
 
 
