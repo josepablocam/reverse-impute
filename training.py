@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 from tensorboardX import SummaryWriter
 import torch
+import torch.distributions
 import torch.optim as optim
 import torch.utils.data as data
 import tqdm
@@ -89,6 +90,12 @@ def get_data(df, frac_valid, frac_test, seed=None):
     return datasets
 
 
+def add_white_noise(X):
+    dist = torch.distributions.normal.Normal(0.0, 1.0)
+    noise = dist.sample(X.shape)
+    return X + noise
+
+
 class Trainer(object):
     def __init__(self, ma_max_ct=50):
         self.ma_max_ct = ma_max_ct
@@ -112,6 +119,7 @@ class Trainer(object):
             model,
             datasets,
             num_iters,
+            with_noise=False,
             batch_size=100,
             valid_every_n_batches=None,
             device="cpu",
@@ -139,7 +147,9 @@ class Trainer(object):
         )
 
         for _ in tqdm.tqdm(range(num_iters)):
-            for X, y in train_loader:
+            for X, y in tqdm.tqdm(train_loader):
+                if with_noise:
+                    X = add_white_noise(X)
                 X = X.to(torch.device(device))
                 y = y.to(torch.device(device))
                 optimizer.zero_grad()
@@ -225,15 +235,26 @@ def get_args():
         default=100,
     )
     parser.add_argument(
+        "--ts_length",
+        type=int,
+        help="Number of obs per time series",
+        default=100,
+    )
+    parser.add_argument(
         "--valid_every_n_batches",
         type=int,
         help="Validate model every n batches",
-        default=10,
+        default=100,
     )
     parser.add_argument(
         "--seed",
         type=int,
         help="RNG seed for data splitting",
+    )
+    parser.add_argument(
+        "--with_noise",
+        action="store_true",
+        help="Add white noise to X during training",
     )
     parser.add_argument(
         "--log",
@@ -246,6 +267,8 @@ def get_args():
 def main():
     args = get_args()
     df = pd.read_csv(args.input)
+    if args.ts_length:
+        df = prune_to_same_length(df, args.ts_length)
     print("Preparing data split")
     ts_data = get_data(
         df,
@@ -258,6 +281,7 @@ def main():
         pred_hidden_size=args.hidden_size,
         num_layers=args.num_layers,
     )
+    print("Model parameter count: {}".format(model.count_parameters()))
     trainer = Trainer()
     if torch.cuda.is_available():
         device = "cuda"
@@ -267,6 +291,7 @@ def main():
         model,
         ts_data,
         num_iters=args.num_iters,
+        with_noise=args.with_noise,
         batch_size=args.batch_size,
         valid_every_n_batches=args.valid_every_n_batches,
         device=device,

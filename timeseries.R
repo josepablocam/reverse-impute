@@ -65,7 +65,15 @@ impute_missing <- function(vec, method_name) {
     chosen_method(vec)
 }
 
-generate_dataset <- function(input_, num_obs=200, prob_bounds=c(0.1, 0.5), methods=c("mean"), num_iters=10, seed=NULL) {
+generate_dataset <- function(
+    input_,
+    num_obs=200,
+    simulate_ts=FALSE,
+    prob_bounds=c(0.0, 0.2),
+    methods=c("mean"),
+    num_iters=10,
+    seed=NULL
+) {
     if (!is.null(seed)) {
       set.seed(seed)
     }
@@ -97,6 +105,12 @@ generate_dataset <- function(input_, num_obs=200, prob_bounds=c(0.1, 0.5), metho
             ts_id <- ts_ids[ts_ix]
             ts_data <- existing_ts_df[existing_ts_df$ts_id == ts_id, ]
             ts_vec <- ts_data$orig
+            if (simulate_ts) {
+                model <- auto.arima(ts_vec)
+                # simulate and replace original
+                ts_vec <- simulate(model, future=FALSE)
+            }
+
         }
         for (iter_ in seq(num_iters)) {
             prob <- runif(1, min=prob_bounds[1], max=prob_bounds[2])
@@ -138,25 +152,69 @@ get_mse <- function(v1, v2) {
 }
 
 
-minimize_mse <- function(vec, probs, step_size, methods=NULL) {
+# minimize_mse <- function(vec, probs, step_size, methods=NULL) {
+#   if (is.null(methods)) {
+#     methods <- names(AVAILABLE_IMPUTATION_METHODS)
+#   }
+#
+#   thresh <- max(probs)
+#   curr_min_mse <- NULL
+#   curr_min_mse_method <- NULL
+#   curr_min_thresh <- thresh
+#   curr_predicted <- rep(FALSE, length(vec))
+#
+#   history_mse <- c()
+#   history_thresh <- c()
+#   num_iters <- 0
+#
+#   while (thresh > 0.0) {
+#       copy_vec <- vec
+#       copy_vec[probs >= thresh] <- NA
+#       iter_mse <- c()
+#       for(method in methods) {
+#           filled_vec <- tryCatch(
+#             {impute_missing(copy_vec, method)},
+#             error = function(e) NULL
+#           )
+#           if (!is.null(filled_vec)) {
+#               method_mse <- get_mse(vec, filled_vec)
+#               iter_mse <- c(iter_mse, method_mse)
+#           }
+#       }
+#       if (length(iter_mse) == 0) {
+#           # all methods failed to impute, too many missing values
+#           break
+#       }
+#       min_iter_mse <- min(iter_mse)
+#       history_mse <- c(history_mse, min_iter_mse)
+#       history_thresh <- c(history_thresh, thresh)
+#       if (is.null(curr_min_mse) || (min_iter_mse <= curr_min_mse)) {
+#         curr_min_mse <- min_iter_mse
+#         curr_min_mse_method <- methods[which(min_iter_mse == iter_mse)[1]]
+#         curr_min_thresh <- thresh
+#         curr_predicted <- is.na(copy_vec)
+#       }
+#       thresh <- thresh - step_size
+#       num_iters <- num_iters + 1
+#   }
+#   list(mse=curr_min_mse, method=curr_min_mse_method, threshold=curr_min_thresh, predicted=curr_predicted, num_iters=num_iters, history_mse=history_mse, history_thresh=history_thresh)
+# }
+
+minimize_mse <- function(vec, probs, num_steps, methods=NULL) {
   if (is.null(methods)) {
     methods <- names(AVAILABLE_IMPUTATION_METHODS)
   }
 
-  thresh <- max(probs)
-  curr_min_mse <- NULL
-  curr_min_mse_method <- NULL
-  curr_min_thresh <- thresh
-  curr_predicted <- rep(FALSE, length(vec))
 
-  history_mse <- c()
-  history_thresh <- c()
-  num_iters <- 0
+  thresholds <- seq(min(probs), max(probs), length.out=num_steps)
+  results <- list()
+  ix <- 1
+  vec <- as.numeric(vec)
 
-  while (thresh > 0.0) {
+  for(threshold in thresholds) {
       copy_vec <- vec
-      copy_vec[probs >= thresh] <- NA
-      iter_mse <- c()
+      copy_vec[probs >= threshold] <- NA
+      removed <- sum(is.na(copy_vec))
       for(method in methods) {
           filled_vec <- tryCatch(
             {impute_missing(copy_vec, method)},
@@ -164,29 +222,22 @@ minimize_mse <- function(vec, probs, step_size, methods=NULL) {
           )
           if (!is.null(filled_vec)) {
               method_mse <- get_mse(vec, filled_vec)
-              iter_mse <- c(iter_mse, method_mse)
+          } else {
+              method_mse <- NA
           }
-      }
-      if (length(iter_mse) == 0) {
-          # all methods failed to impute, too many missing values
-          break
-      }
-      min_iter_mse <- min(iter_mse)
-      history_mse <- c(history_mse, min_iter_mse)
-      history_thresh <- c(history_thresh, thresh)
-      if (is.null(curr_min_mse) || (min_iter_mse <= curr_min_mse)) {
-        curr_min_mse <- min_iter_mse
-        curr_min_mse_method <- methods[which(min_iter_mse == iter_mse)[1]]
-        curr_min_thresh <- thresh
-        curr_predicted <- is.na(copy_vec)
-      }
-      thresh <- thresh - step_size
-      num_iters <- num_iters + 1
-  }
-  list(mse=curr_min_mse, method=curr_min_mse_method, threshold=curr_min_thresh, predicted=curr_predicted, num_iters=num_iters, history_mse=history_mse, history_thresh=history_thresh)
+
+          results[[ix]] <- as.data.frame(list(threshold=threshold, removed=removed, method=method, mse=method_mse))
+          ix <- ix + 1
+        }
+    }
+    info <- as.data.frame(rbindlist(results))
+    # TODO:
+    # SOMETHING HERE?
 }
 
+
 forecast_tsclean <- function(x) {
+    x <- as.numeric(x)
     cleaned <- tsclean(x, replace.missing=FALSE, lambda="auto")
     changed <- which(cleaned != x)
     copy_x <- x
@@ -195,6 +246,7 @@ forecast_tsclean <- function(x) {
 }
 
 tsoutliers_tsoutliers <- function(x) {
+    x <- as.numeric(x)
     results <- tsoutliers(x)
     copy_x <- x
     copy_x[results$index] <- NA

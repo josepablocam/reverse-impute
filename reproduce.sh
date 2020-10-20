@@ -18,6 +18,8 @@ fi
 # length of time series
 TS_LENGTH=100
 EVAL_SAMPLE=5000
+HIDDEN_SIZE=100
+NUM_LAYERS=3
 
 # Generate synthetic data
 if [[ $# -eq 1 && $1 == "--generate" ]]
@@ -48,7 +50,7 @@ fi
 TRAIN_LOG="${DATA_DIR}/train/logs/"
 if [ -d ${TRAIN_LOG} ]
 then
-  rm -r ${TRAIN_LOG}
+  rm -rf ${TRAIN_LOG}
 fi
 tensorboard --logdir ${TRAIN_LOG} --host 0.0.0.0 --port 8888 > /dev/null &
 
@@ -57,13 +59,13 @@ mkdir "${DATA_DIR}/train/"
 python training.py \
   --input "${DATA_DIR}/generated.csv" \
   --output "${DATA_DIR}/train/" \
-  --valid 0.2 \
-  --test 0.1 \
-  --hidden_size 50 \
-  --num_layers 3 \
-  --num_iters 20 \
+  --valid 0.1 \
+  --test 0.2 \
+  --hidden_size ${HIDDEN_SIZE} \
+  --num_layers ${NUM_LAYERS} \
+  --num_iters 5 \
   --batch_size 100 \
-  --valid_every_n_batches 10 \
+  --valid_every_n_batches 100 \
   --seed 42 \
   --log ${TRAIN_LOG}
 
@@ -74,8 +76,8 @@ python evaluate.py \
     --dataset "${DATA_DIR}/train/dataset.pkl" \
     --model "${DATA_DIR}/train/model.pth" \
     --baselines tsoutliers tsclean manual \
-    --hidden_size 50 \
-    --num_layers 3 \
+    --hidden_size ${HIDDEN_SIZE} \
+    --num_layers ${NUM_LAYERS} \
     --sample ${EVAL_SAMPLE} \
     --seed 42 \
     --output "${DATA_DIR}/eval-synthetic/no-noise-results.csv"
@@ -84,8 +86,8 @@ python evaluate.py \
     --dataset "${DATA_DIR}/train/dataset.pkl" \
     --model "${DATA_DIR}/train/model.pth" \
     --baselines tsoutliers tsclean manual \
-    --hidden_size 50 \
-    --num_layers 3 \
+    --hidden_size ${HIDDEN_SIZE} \
+    --num_layers ${NUM_LAYERS} \
     --with_noise \
     --sample ${EVAL_SAMPLE} \
     --seed 42 \
@@ -95,11 +97,11 @@ python evaluate.py \
 mkdir "${DATA_DIR}/eval-sp500/"
 python evaluate.py \
     --csv "${DATA_DIR}/sp500_prices_with_missing.csv" \
-    --valid 0.5 \
-    --test 0.5 \
+    --valid 0.25 \
+    --test 0.75 \
     --model "${DATA_DIR}/train/model.pth" \
-    --hidden_size 50 \
-    --num_layers 3 \
+    --hidden_size ${HIDDEN_SIZE} \
+    --num_layers ${NUM_LAYERS} \
     --baselines tsoutliers tsclean manual \
     --ts_length ${TS_LENGTH} \
     --sample ${EVAL_SAMPLE} \
@@ -109,17 +111,36 @@ python evaluate.py \
 
 python evaluate.py \
     --csv "${DATA_DIR}/sp500_prices_with_missing.csv" \
-    --valid 0.5 \
-    --test 0.5 \
+    --valid 0.25 \
+    --test 0.75 \
     --model "${DATA_DIR}/train/model.pth" \
-    --hidden_size 50 \
-    --num_layers 3 \
+    --hidden_size ${HIDDEN_SIZE} \
+    --num_layers ${NUM_LAYERS} \
     --baselines tsoutliers tsclean manual \
     --ts_length ${TS_LENGTH} \
     --with_noise \
     --seed 42 \
     --sample ${EVAL_SAMPLE} \
     --output "${DATA_DIR}/eval-sp500/with-noise-results.csv"
+
+
+
+# train on real data
+mkdir "${DATA_DIR}/train-sp500/"
+python training.py \
+  --input "${DATA_DIR}/sp500_prices_with_missing.csv" \
+  --output "${DATA_DIR}/train-sp500/" \
+  --valid 0.2 \
+  --test 0.2 \
+  --hidden_size ${HIDDEN_SIZE} \
+  --num_layers ${NUM_LAYERS} \
+  --num_iters 5 \
+  --batch_size 100 \
+  --ts_length ${TS_LENGTH} \
+  --sample ${EVAL_SAMPLE} \
+  --valid_every_n_batches 100 \
+  --seed 42 \
+  --log "${DATA_DIR}/train-sp500/logs/"
 
 
 

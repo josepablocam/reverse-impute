@@ -114,11 +114,20 @@ class SequenceEncoder(nn.Module):
                 batch_first=True,
                 bidirectional=True,
             )
-            self.attention = None
-            if attention:
-                self.attention = AttentionBasedSummarizer(hidden_size * 2)
+        elif encoder_type == "gru":
+            self.encoder = nn.GRU(
+                input_size=1,
+                hidden_size=hidden_size,
+                num_layers=num_layers,
+                batch_first=True,
+                bidirectional=True,
+            )
         else:
             raise Exception("Unknown model type: {}".format(encoder_type))
+
+        self.attention = None
+        if attention:
+            self.attention = AttentionBasedSummarizer(hidden_size * 2)
 
     def zscore(self, batch):
         # batch shape: (num_ts, num steps, 1)
@@ -141,7 +150,7 @@ class SequenceEncoder(nn.Module):
         if len(batch.shape) == 2:
             batch = batch.unsqueeze(2)
         batch = self.zscore(batch)
-        H, (hn, cn) = self.encoder(batch)
+        H, _ = self.encoder(batch)
         # append to each num steps the observed value as well
         # technically already captured by hidden state, but still
         # adding
@@ -175,7 +184,12 @@ class ReverseImputer(nn.Module):
 
     def compute_loss(self, batch_x, batch_y):
         pred_y = self.forward(batch_x)
-        return self.loss_fun(pred_y, batch_y)
+        flat_y = batch_y.flatten()
+        n_pos = flat_y.sum()
+        pos_weight = ((len(flat_y) - n_pos) / (n_pos + 1e-5))
+        # pos_weight = torch.tensor(1.0)
+        loss_fun = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+        return loss_fun(pred_y, batch_y)
 
     def get_device(self):
         return next(self.parameters()).device
@@ -197,6 +211,12 @@ class ReverseImputer(nn.Module):
 
     def load(self, path):
         self.load_state_dict(torch.load(path))
+
+    def count_parameters(self):
+        ct = 0
+        for p in self.parameters():
+            ct += len(p.flatten())
+        return ct
 
 
 class ModelWrapper(object):

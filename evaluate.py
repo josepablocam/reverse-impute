@@ -25,6 +25,7 @@ def summary_classification_stats(y_obs, y_pred, y_probs, stats=None):
         "recall": lambda x: sklearn.metrics.recall_score(x[0], x[1]),
         "f1": lambda x: sklearn.metrics.f1_score(x[0], x[1]),
         "auc": lambda x: sklearn.metrics.roc_auc_score(x[0], x[2]),
+        "acc": lambda x: sklearn.metrics.accuracy_score(x[0], x[1]),
     }
     results = {}
     for stat_name in stats:
@@ -299,6 +300,11 @@ def get_args():
         type=int,
         help="Sample n timeseries for evaluation across each split of data",
     )
+    parser.add_argument(
+        "--eval_on_train",
+        action="store_true",
+        help="Evaluate on training data, for purposes of checking if fitting",
+    )
     return parser.parse_args()
 
 
@@ -342,10 +348,19 @@ def main():
     if args.with_noise:
         ts_data = add_noise(ts_data, method="white-gaussian", seed=args.seed)
 
+    if args.eval_on_train:
+        ts_data["valid"] = ts_data["train"]
+        ts_data["test"] = ts_data["train"]
 
-
+    import debug
+    probs_df = debug.get_probs_df(model, ts_data["test"])
+    debug.plot_probs(probs_df)
+    import matplotlib.pyplot as plt
+    plt.ion()
+    plt.show()
     results_df = run_evaluation(ts_data, model, baselines)
     results_df.to_csv(args.output, index=False)
+    import pdb; pdb.set_trace()
 
 
 if __name__ == "__main__":
